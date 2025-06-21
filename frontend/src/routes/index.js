@@ -1,13 +1,12 @@
-// All components mapping with path for internal routes
+import { lazy } from 'react';
+import Rotations from '../pages/protected/Rotations';
+import Inventory from '../pages/protected/Inventory'; // Nouveau composant
 
-import { lazy } from 'react'
-import Rotations from '../pages/protected/Rotations'
-
-const Dashboard = lazy(() => import('../pages/protected/Dashboard'))
-const Welcome = lazy(() => import('../pages/protected/Welcome'))
-const Charts = lazy(() => import('../pages/protected/Charts'))
-const Leads = lazy(() => import('../pages/protected/Leads'))
-const Dimensions = lazy(()=>import('../pages/protected/Dimensions'))
+const Dashboard = lazy(() => import('../pages/protected/Dashboard'));
+const Welcome = lazy(() => import('../pages/protected/Welcome'));
+const Charts = lazy(() => import('../pages/protected/Charts'));
+const Leads = lazy(() => import('../pages/protected/Leads'));
+const Dimensions = lazy(() => import('../pages/protected/Dimensions'));
 
 const routes = [
   {
@@ -22,8 +21,6 @@ const routes = [
     path: '/leads',
     component: Leads,
   },
-
-
   {
     path: '/charts',
     component: Charts,
@@ -36,8 +33,10 @@ const routes = [
     path: '/rotations',
     component: Rotations,
   },
+  {
+    path: '/inventory', // Nouvelle route interne
+    component: Inventory, // Composant d'inventaire
+  },
+];
 
-
-]
-
-export default routes
+export default routes;

@@ -7,7 +7,8 @@ import ChartBarIcon from '@heroicons/react/24/outline/ChartBarIcon';
 import InboxArrowDownIcon from '@heroicons/react/24/outline/InboxArrowDownIcon';
 import KeyIcon from '@heroicons/react/24/outline/KeyIcon';
 import CubeIcon from '@heroicons/react/24/outline/CubeIcon';
-import ArrowPathIcon from '@heroicons/react/24/outline/ArrowPathIcon'; // Corrected import
+import ArrowPathIcon from '@heroicons/react/24/outline/ArrowPathIcon';
+import ClipboardDocumentListIcon from '@heroicons/react/24/outline/ClipboardDocumentListIcon'; // Nouvelle icône pour inventaire
 
 // Lazy-loaded components
 const Dashboard = lazy(() => import('../pages/protected/Dashboard'));
@@ -16,6 +17,7 @@ const Charts = lazy(() => import('../pages/protected/Charts'));
 const Leads = lazy(() => import('../pages/protected/Leads'));
 const Dimensions = lazy(() => import('../pages/protected/Dimensions'));
 const Rotations = lazy(() => import('../pages/protected/Rotations'));
+const Inventory = lazy(() => import('../pages/protected/Inventory')); // Nouveau composant
 
 const ForgotPassword = lazy(() => import('../pages/ForgotPassword'));
 
@@ -55,10 +57,16 @@ const routes = [
         name: 'Dimensions',
     },
     {
-        path: '/app/rotations', // Nouveau chemin pour les rotations
+        path: '/app/rotations',
         component: Rotations,
-        icon: <ArrowPathIcon className={iconClasses} />, // Icône mise à jour
-        name: 'Calcul des rotations', // Nom reflétant la fonctionnalité
+        icon: <ArrowPathIcon className={iconClasses} />,
+        name: 'Calcul des rotations',
+    },
+    {
+        path: '/app/inventory', // Nouvelle route pour l'inventaire
+        component: Inventory,
+        icon: <ClipboardDocumentListIcon className={iconClasses} />, // Icône appropriée
+        name: 'Gestion de l\'Inventaire', // Nom clair
     },
     {
         path: '',

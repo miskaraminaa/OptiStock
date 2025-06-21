@@ -4,6 +4,7 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const dimensionsRouter = require('./routes/dimensions');
+const inventoryRouter = require('./routes/inventory'); // Vérifiez que ce fichier existe
 let livraisonRouter;
 let uploadRouter;
 
@@ -36,13 +37,14 @@ app.use((req, res, next) => {
     next();
 });
 
-// Routes avec préfixe /api
+
 app.use('/auth', authRoutes); // Supprimez /register redondant
 if (uploadRouter) {
     app.use('/uploads', uploadRouter);
 }
 app.use('/livraison', livraisonRouter);
 app.use('/dimensions', dimensionsRouter);
+app.use('/inventory', inventoryRouter); // Vérifiez le préfixe
 
 // Route de test DB
 app.get('/test-db', async (req, res) => {
