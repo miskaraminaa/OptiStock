@@ -1,0 +1,39 @@
+.data-table-container {
+    margin-top: 20px;
+    max-width: 1000px;
+}
+
+.column-pagination-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.table-wrapper {
+    overflow-x: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+    padding: 8px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+.sticky-col {
+    position: sticky;
+    left: 0;
+    background: #f8f8f8;
+    z-index: 1;
+}
+
+.no-data {
+    text-align: center;
+    padding: 20px;
+    color: #888; }
