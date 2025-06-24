@@ -1,6 +1,6 @@
 import { lazy } from 'react';
 import Rotations from '../pages/protected/Rotations';
-import Inventory from '../pages/protected/Inventory'; // Nouveau composant
+import Explorer from '../pages/protected/Explorer';
 
 const Dashboard = lazy(() => import('../pages/protected/Dashboard'));
 const Welcome = lazy(() => import('../pages/protected/Welcome'));
@@ -10,7 +10,7 @@ const Dimensions = lazy(() => import('../pages/protected/Dimensions'));
 
 const routes = [
   {
-    path: '/dashboard', // the url
+    path: '/dashboard', 
     component: Dashboard, // view rendered
   },
   {
@@ -34,8 +34,8 @@ const routes = [
     component: Rotations,
   },
   {
-    path: '/inventory', // Nouvelle route interne
-    component: Inventory, // Composant d'inventaire
+    path: '/explorer', 
+    component: Explorer, 
   },
 ];
 

@@ -66,12 +66,89 @@ const fileTypeToTable = {
     LST: 'ls_tache',
     MB51: 'mb51',
     MOUVEMENT: 'mouvement',
-    STOCK_EMW: 'stock_emw',
+    STOCK_EWM: 'stock_ewm',
     ETAT_DE_STOCK: 'etat_de_stock',
 };
 
-// Column mappings
+// Column mappings (keeping le_status as provided)
 const columnMappings = {
+    le_status: {
+        "Bloqué (global)": "bloque_global",
+        "Document": "document",
+        "Type de document": "type_document",
+        "Description du type de document": "description_type_document",
+        "Généré manuellement": "genere_manuellement",
+        "Véhicule": "vehicule",
+        "Unité de transport": "unite_transport",
+        "Exécution logistique : livraison": "execution_logistique_livraison",
+        "Commande d'achat": "commande_achat",
+        "Numéro RMA": "numero_rma",
+        "Ordre de production": "ordre_production",
+        "Avis de livraison": "avis_livraison",
+        "Statut activité magasin": "statut_activite_magasin",
+        "Statut transit": "statut_transit",
+        "Statut entrée de stock": "statut_entree_stock",
+        "Statut d'entrée en stock (plan)": "statut_entree_stock_plan",
+        "Statut de l'entrée de marchandises": "statut_entree_marchandises",
+        "Déchargement": "dechargement",
+        "Procédure envoi": "procedure_envoi",
+        "Lettre de voiture": "lettre_voiture",
+        "Numéro PRO": "numero_pro",
+        "Document de fret": "document_fret",
+        "Transporteur": "transporteur",
+        "Porte magasin": "porte_magasin",
+        "Point de déchargement": "point_dechargement",
+        "Exp. marchandises": "exp_marchandises",
+        "Site cédant": "site_cedant",
+        "Réceptionnaire définitif marchandises": "receptionnaire_definitif_marchandises",
+        "Bureau réception": "bureau_reception",
+        "Points de priorité": "points_priorite",
+        "Nombre de postes": "nombre_postes",
+        "Nombre d'unités de manutention": "nombre_unites_manutention",
+        "Nombre de produits": "nombre_produits",
+        "Date de livraison (planifiée)": "date_livraison_planifiee",
+        "Heure de livraison (planifiée)": "heure_livraison_planifiee",
+        "Date planifiée entrée des marchandises": "date_planifiee_entree_marchandises",
+        "Hre planif. entrée marchandise": "heure_planifiee_entree_marchandises",
+        "Date de la livraison sortante": "date_livraison_sortante",
+        "Heure de livraison sortante": "heure_livraison_sortante",
+        "Numéro d'opération TCD": "numero_operation_tcd",
+        "Type de planification du transport": "type_planification_transport",
+        "Description du transporteur": "description_transport",
+        "Description de l'expéditeur marchandises": "description_expediteur_marchandises",
+        "Description du site cédant": "description_site_cedant",
+        "Description réceptionnaire final marchandises": "description_receptionnaire_final_marchandises",
+        "Statut sortie entrée et répartition": "statut_sortie_entree_repartition",
+        "Statut de déchargement et de répartition": "statut_dechargement_repartition",
+        "Statut déchargt planif. et répartition": "statut_dechargement_planifie_repartition",
+        "Statut entrée en stock plan. et répart.": "statut_entree_stock_planifie_reparti",
+        "Statut d'entrée en stock et répartition": "statut_entree_stock_repartition",
+        "Refusé": "refuse",
+        "Créé le": "cree_le",
+        "Créé(e) à": "cree_a",
+        "Créé par": "cree_par",
+        // Additional mappings for problematic headers
+        "avis de livraison": "avis_livraison",
+        "statut transit": "statut_transit",
+        "statut entrée de stock": "statut_entree_stock",
+        "statut d'entrée en stock (plan)": "statut_entree_stock_plan",
+        "statut de l'entrée de marchandises": "statut_entree_marchandises",
+        "déchargement": "dechargement",
+        "lettre de voiture": "lettre_voiture",
+        "numéro pro": "numero_pro",
+        "point de déchargement": "point_dechargement",
+        "exp. marchandises": "exp_marchandises",
+        "site cédant": "site_cedant",
+        "bureau réception": "bureau_reception",
+        "description de l'expéditeur marchandises": "description_expediteur_marchandises",
+        "description du site cédant": "description_site_cedant",
+        "statut sortie entrée et répartition": "statut_sortie_entree_repartition",
+        "statut de déchargement et de répartition": "statut_dechargement_repartition",
+        "statut déchargt planif. et répartition": "statut_dechargement_planifie_repartition",
+        "statut entrée en stock plan. et répart.": "statut_entree_stock_planifie_reparti",
+        "statut d'entrée en stock et répartition": "statut_entree_stock_repartition",
+        "refusé": "refuse"
+    },
     le_tache: {
         "Tâche magasin": "Tache_magasin",
         "Produit": "Produit",
@@ -171,69 +248,6 @@ const columnMappings = {
         "TM à sous-système": "TM_sous_systeme",
         "Prélever stock total de l'emplacement": "Prelever_stock_total_emplacement"
     },
-    le_status: {
-        "Bloqué (global)": "bloque_global",
-        "Document": "document",
-        "Type de document": "type_document",
-        "Description du type de document": "description_type_document",
-        "Généré manuellement": "genere_manuellement",
-        "Véhicule": "vehicule",
-        "Unité de transport": "unite_transport",
-        "Transporteur": "transporteur",
-        "Bureau d'expédition": "bureau_expedition",
-        "Récept. march.": "recept_march",
-        "Site prenant": "site_prenant",
-        "Réceptionnaire définitif marchandises": "receptionnaire_definitif_marchandises",
-        "Nombre de postes": "nombre_postes",
-        "Nombre d'unités de manutention": "nombre_unites_manutention",
-        "Nombre de produits": "nombre_produits",
-        "Itinéraire": "itineraire",
-        "Calendrier de départ/Tournée": "calendrier_depart_tournee",
-        "Origine données de base itin.": "origine_donnees_base_itin",
-        "Date de départ de l'itinéraire planifiée": "date_depart_itineraire_planifiee",
-        "Hre départ itinéraire planif.": "heure_depart_itineraire_planifiee",
-        "Appartenance à vague de prélèvement": "appartenance_vague_prelevement",
-        "Porte magasin": "porte_magasin",
-        "Statut activité magasin": "statut_activite_magasin",
-        "Statut du prélèvement": "statut_prelevement",
-        "Statut prélèvement (plan)": "statut_prelevement_plan",
-        "Statut emballage": "statut_emballage",
-        "Charger": "charger",
-        "Statut sortie de marchandises": "statut_sortie_marchandises",
-        "Statut détermination de l'itinéraire": "statut_determination_itineraire",
-        "Procédure envoi": "procedure_envoi",
-        "Terminé": "termine",
-        "Commande client": "commande_client",
-        "Numéro RMA": "numero_rma",
-        "Commande d'achat": "commande_achat",
-        "Ordre de production": "ordre_production",
-        "Exécution logistique : livraison": "execution_logistique_livraison",
-        "Document d'origine ERP": "document_origine_erp",
-        "Cde achat répart. march.": "commande_achat_repartition_marchandise",
-        "Lettre de voiture": "lettre_de_voiture",
-        "Numéro d'opération TCD": "numero_operation_tcd",
-        "Document de fret": "document_fret",
-        "Date de livraison (planifiée)": "date_livraison_planifiee",
-        "Heure de livraison (planifiée)": "heure_livraison_planifiee",
-        "Date de livraison définitive": "date_livraison_definitive",
-        "Heure de livraison définitive": "heure_livraison_definitive",
-        "Type de planification du transport": "type_planification_transport",
-        "Description du transporteur": "description_transporteur",
-        "Description réceptionnaire marchandises": "description_receptionnaire_marchandises",
-        "Description du site prenant": "description_site_prenant",
-        "Descr. réceptionnaire final marchandises": "description_receptionnaire_final_marchandises",
-        "Statut prél. march. et répart. du plan": "statut_prelevement_repartition_plan",
-        "Statut de prélèvement et de répartition": "statut_prelevement_et_repartition",
-        "Statut \"Embal. prêt pr envoi et répart.\"": "statut_emballage_pret_envoi_repartition",
-        "Statut pr mise à dispo. et répartition": "statut_mise_disposition_repartition",
-        "Statut de chargement et de répartition": "statut_chargement_et_repartition",
-        "Statut sortie march. et répartition": "statut_sortie_marchandises_repartition",
-        "Créé le": "cree_le",
-        "Créé(e) à": "cree_a",
-        "Numéro de séquence": "numero_sequence",
-        "Pertinence des marchandises dangereuses": "pertinence_marchandises_dangereuses",
-        "Créé par": "cree_par"
-    },
     ls_status: {
         "Bloqué (global)": "bloque_global",
         "Document": "document",
@@ -253,7 +267,7 @@ const columnMappings = {
         "Itinéraire": "itineraire",
         "Calendrier de départ/Tournée": "calendrier_depart_tournee",
         "Origine données de base itin.": "origine_donnees_base_itin",
-        "Date de départ de l'itinéraire planifiée": "date_depart_itineraire_planifiee",
+        "Date de départ planifiée": "date_depart_itineraire_planifiee",
         "Hre départ itinéraire planif.": "heure_depart_itineraire_planifiee",
         "Appartenance à vague de prélèvement": "appartenance_vague_prelevement",
         "Porte magasin": "porte_magasin",
@@ -273,16 +287,16 @@ const columnMappings = {
         "Exécution logistique : livraison": "execution_logistique_livraison",
         "Document d'origine ERP": "document_origine_erp",
         "Cde achat répart. march.": "commande_achat_repartition_marchandise",
-        "Lettre de voiture": "lettre_de_voiture",
+        "Lettre de voiture": "lettre_voiture",
         "Numéro d'opération TCD": "numero_operation_tcd",
         "Document de fret": "document_fret",
-        "Date de livraison (planifiée)": "date_livraison_planifiee",
-        "Heure de livraison (planifiée)": "heure_livraison_planifiee",
+        "Date de livraison": "date_livraison_planifiee",
+        "Heure de livraison": "heure_livraison_planifiee",
         "Date de livraison définitive": "date_livraison_definitive",
         "Heure de livraison définitive": "heure_livraison_definitive",
         "Type de planification du transport": "type_planification_transport",
         "Description du transporteur": "description_transporteur",
-        "Description réceptionnaire marchandises": "description_receptionnaire_marchandises",
+        "Description réceptionnaire marchandises": "description_reception_marchandises",
         "Description du site prenant": "description_site_prenant",
         "Descr. réceptionnaire final marchandises": "description_receptionnaire_final_marchandise",
         "Statut prél. march. et répart. du plan": "statut_prelevement_repartition_plan",
@@ -406,10 +420,10 @@ const columnMappings = {
         "Code mouvement": "code_mouvement",
         "Qté en unité saisie": "qte_en_unite_saisie",
         "Ordre": "ordre",
-        "UQ de saisie": "uq_de_saisie",
+        "UQA de saisie": "uq_de_saisie",
         "Montant DI": "montant_di",
-        "Date de saisie": "date_de_saisie",
-        "Heure de saisie": "heure_de_saisie",
+        "Date de saisie": "date_saisie",
+        "Heure de saisie": "heure_saisie",
         "Nom de l'utilisateur": "nom_de_l_utilisateur",
         "Commande d'achat": "commande_achat",
         "Quantité": "quantite",
@@ -421,7 +435,7 @@ const columnMappings = {
         "Exercice doc.article": "exercice_doc_article",
         "Poste doc. article": "poste_doc_article",
         "Société": "societe",
-        "Bon d'accompagnement": "bon_daccompagnement",
+        "Bon d'accompagnement": "bon_d_accompagnement",
         "Centre de coûts": "centre_de_couts",
         "Client": "client",
         "Code débit/crédit": "code_debit_credit",
@@ -464,7 +478,7 @@ const columnMappings = {
         "Valeur de vente": "valeur_vente",
         "Fournisseur": "fournisseur"
     },
-        mouvement: {
+    mouvement: {
         "Organisation": "organisation",
         "ID": "mouvement_ref_id",
         "Magasin": "magasin",
@@ -491,22 +505,47 @@ const columnMappings = {
         "Matricule Tiers": "matricule_tiers",
         "Matricule Immobilisation": "matricule_immobilisation",
         "Matricule FA": "matricule_fa"
+    },
+    stock_ewm: {
+        "Article": "article",
+        "Désignation Article": "designation_article",
+        "Numéro de Magasin": "numero_magasin",
+        "Division": "division",
+        "Magasin": "magasin",
+        "Emplacement": "emplacement",
+        "Type de Magasin": "type_magasin",
+        "Quantité": "quantite",
+        "Unité Qté de Base": "unite_qte_base",
+        "Type de Stock": "type_stock",
+        " type stock": "designation_type_stock",
+        "Groupe Valorisation": "groupe_valorisation",
+        "Prix": "prix",
+        "Valeur de Stock": "valeur_stock",
+        "Devise": "devise",
+        "Date EM": "date_em",
+        "Dernière Sortie": "derniere_sortie"
     }
-      
 };
 
 // Debug columnMappings
-console.log('Loaded columnMappings keys:', Object.keys(columnMappings));
+console.log('Loaded columnMappings.le_status keys:', Object.keys(columnMappings.le_status));
 
-// Normalize Excel headers
+// Enhanced normalizeHeader function
 const normalizeHeader = (header) => {
-    if (typeof header !== 'string') return '';
-    return header
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
+    if (typeof header !== 'string') {
+        console.warn('Non-string header encountered:', header, 'Type:', typeof header);
+        return '';
+    }
+    const normalized = header
+        .normalize('NFD') // Decompose diacritics
+        .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+        .replace(/[\s\u00A0]+/g, ' ') // Replace all whitespace (including non-breaking spaces) with single space
+        .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters
         .trim()
-        .toLowerCase()
-        .replace(/\s+/g, ' ');
+        .toLowerCase();
+    console.log(`Header "${header}" normalized to "${normalized}", char codes:`,
+        Array.from(header).map(c => c.charCodeAt(0)));
+    return normalized;
 };
 
 // Sanitize file name
@@ -674,43 +713,48 @@ router.post('/', authenticate, upload.single('file'), async (req, res) => {
         }
 
         if (columnTypes['name_file']) {
-console.log('Checking for duplicate file in imported_file:', fileName);
-try {
-    const [rows] = await db.query(
-        'SELECT COUNT(*) AS count FROM imported_file WHERE fichier_name = ?',
-        [fileName]
-    );
-    if (rows[0].count > 0) {
-        console.log('Duplicate file found in imported_file');
-        return res.status(409).json({
-            message: 'File already exists in imported_file table',
-            fileName
-        });
-    }
-} catch (error) {
-    console.error('Database check error:', error);
-    return res.status(500).json({
-        message: 'Database error during file check',
-        error: error.message,
-        sql: error.sql,
-        code: error.code
-    });
-}
+            console.log('Checking for duplicate file in imported_file:', fileName);
+            try {
+                const [rows] = await db.query(
+                    'SELECT COUNT(*) AS count FROM imported_file WHERE fichier_name = ?',
+                    [fileName]
+                );
+                if (rows[0].count > 0) {
+                    console.log('Duplicate file found in imported_file');
+                    return res.status(409).json({
+                        message: 'File already exists in imported_file table',
+                        fileName
+                    });
+                }
+            } catch (error) {
+                console.error('Database check error:', error);
+                return res.status(500).json({
+                    message: 'Database error during file check',
+                    error: error.message,
+                    sql: error.sql,
+                    code: error.code
+                });
+            }
         } else {
             console.log(`No name_file column in ${tableName}; skipping duplicate check`);
         }
 
-        const validColumnMapping = {};
+        // Create case-insensitive mapping with enhanced logging
         const caseInsensitiveMapping = {};
+        const validColumnMapping = {};
         const missingColumns = [];
         for (const [excelCol, dbCol] of Object.entries(columnMapping)) {
             if (columnTypes[dbCol]) {
                 validColumnMapping[excelCol] = dbCol;
-                caseInsensitiveMapping[normalizeHeader(excelCol)] = dbCol;
+                const normalizedKey = normalizeHeader(excelCol);
+                caseInsensitiveMapping[normalizedKey] = dbCol;
+                console.log(`Mapped "${excelCol}" (normalized: "${normalizedKey}") to "${dbCol}"`);
             } else {
                 missingColumns.push(dbCol);
+                console.warn(`Column "${dbCol}" not found in table ${tableName}`);
             }
         }
+        console.log('Case-insensitive mapping:', JSON.stringify(caseInsensitiveMapping, null, 2));
         if (Object.keys(validColumnMapping).length === 0) {
             console.error('No valid columns mapped');
             return res.status(400).json({
@@ -725,17 +769,19 @@ try {
         console.log('Reading Excel file');
         let workbook, data;
         try {
-            workbook = XLSX.read(file.buffer, { type: 'buffer' });
+            workbook = XLSX.read(file.buffer, { type: 'buffer', cellText: false, cellDates: true });
             const sheetName = workbook.SheetNames[0];
             if (!sheetName) {
                 console.log('No sheets found in Excel file');
                 return res.status(400).json({ message: 'Excel file has no sheets' });
             }
-            data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
-            console.log('Excel data rows:', data.length);
-            const headers = Object.keys(data[0] || {});
+            data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { raw: false, dateNF: 'yyyy-mm-dd', header: 1 });
+            // Extract headers from the first row
+            const headers = data[0] || [];
             console.log('Excel headers (raw):', headers);
             console.log('Excel headers (normalized):', headers.map(normalizeHeader));
+            // Convert headers to JSON objects, skipping the header row
+            data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { raw: false, dateNF: 'yyyy-mm-dd' });
             if (data.length === 0) {
                 console.log('Excel file is empty');
                 return res.status(400).json({ message: 'Excel file is empty or has no data rows' });
@@ -759,6 +805,7 @@ try {
                 const mappedData = {};
 
                 let hasValidData = false;
+                const unmatchedHeaders = [];
                 for (const [excelColumn, value] of Object.entries(rowData)) {
                     const normalizedExcelColumn = normalizeHeader(excelColumn);
                     const dbColumn = caseInsensitiveMapping[normalizedExcelColumn];
@@ -768,8 +815,12 @@ try {
                         mappedData[dbColumn] = sanitizedValue;
                         hasValidData = true;
                     } else {
-                        console.log(`Row ${i + 2}: No mapping for column "${excelColumn}" (normalized: "${normalizedExcelColumn}")`);
+                        unmatchedHeaders.push({ excelColumn, normalized: normalizedExcelColumn });
                     }
+                }
+
+                if (unmatchedHeaders.length > 0) {
+                    console.log(`Row ${i + 2}: Unmatched headers:`, JSON.stringify(unmatchedHeaders, null, 2));
                 }
 
                 if (!hasValidData || Object.keys(mappedData).length === 0) {
@@ -777,6 +828,7 @@ try {
                     failureData.push({
                         rowIndex: i + 2,
                         error: 'No valid columns mapped',
+                        unmatchedHeaders,
                         rawData: rowData
                     });
                     continue;
@@ -799,6 +851,7 @@ try {
                     failureData.push({
                         rowIndex: i + 2,
                         error: `Missing required columns: ${missingRequired.join(', ')}`,
+                        unmatchedHeaders,
                         rawData: rowData
                     });
                     continue;
@@ -821,6 +874,7 @@ try {
                     failureData.push({
                         rowIndex: i + 2,
                         error: 'No rows affected',
+                        unmatchedHeaders,
                         rawData: rowData
                     });
                 }
@@ -830,6 +884,7 @@ try {
                 failureData.push({
                     rowIndex: i + 2,
                     error: rowError.message,
+                    unmatchedHeaders: [],
                     rawData: data[i]
                 });
             }
@@ -848,7 +903,6 @@ try {
             console.log(`Inserted file metadata: ID ${importResult.insertId}`);
         } catch (importError) {
             console.error('Error inserting into imported_file:', importError);
-            // Continue with response even if this fails, but log the error
         }
 
         console.log('Building response');
@@ -866,7 +920,8 @@ try {
             columnMapping: {
                 total: Object.keys(columnMapping).length,
                 valid: Object.keys(validColumnMapping).length,
-                missing: missingColumns.length > 0 ? missingColumns : null
+                missing: missingColumns.length > 0 ? missingColumns : null,
+                unmatchedHeaders: failureData.length > 0 ? failureData[0].unmatchedHeaders : []
             },
             data: {
                 headers: Object.keys(data[0] || {}),
@@ -885,6 +940,35 @@ try {
             error: err.message,
             code: err.code,
             sql: err.sql
+        });
+    }
+});
+
+// Test normalize endpoint
+router.post('/test-normalize', authenticate, async (req, res) => {
+    console.log('Starting POST /uploads/test-normalize');
+    try {
+        const { header, table } = req.body;
+        if (!header || !table) {
+            return res.status(400).json({ message: 'Missing header or table parameter' });
+        }
+        const columnMapping = columnMappings[table] || {};
+        const caseInsensitiveMapping = {};
+        for (const [excelCol, dbCol] of Object.entries(columnMapping)) {
+            caseInsensitiveMapping[normalizeHeader(excelCol)] = dbCol;
+        }
+        const normalized = normalizeHeader(header);
+        const dbColumn = caseInsensitiveMapping[normalized] || 'No mapping found';
+        return res.status(200).json({
+            rawHeader: header,
+            normalizedHeader: normalized,
+            mappedColumn: dbColumn
+        });
+    } catch (err) {
+        console.error('Test normalize error:', err);
+        return res.status(500).json({
+            message: 'Test normalize failed',
+            error: err.message
         });
     }
 });

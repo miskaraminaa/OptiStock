@@ -13,7 +13,7 @@ const FileUpload = () => {
     const [isLoading, setIsLoading] = useState(true);
     const navigate = useNavigate();
 
-    const fileTypes = ['LE', 'LET', 'LS', 'LST', 'MB51', 'MOUVEMENT', 'STOCK_EMW', 'ETAT_DE_STOCK'];
+    const fileTypes = ['LE', 'LET', 'LS', 'LST', 'MB51', 'MOUVEMENT', 'STOCK_EWM', 'ETAT_DE_STOCK'];
     const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
     // Verify token on component mount

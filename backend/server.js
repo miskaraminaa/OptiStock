@@ -4,7 +4,8 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const dimensionsRouter = require('./routes/dimensions');
-const inventoryRouter = require('./routes/inventory'); // Vérifiez que ce fichier existe
+const explorationRouter = require('./routes/exploration');
+
 let livraisonRouter;
 let uploadRouter;
 
@@ -44,8 +45,7 @@ if (uploadRouter) {
 }
 app.use('/livraison', livraisonRouter);
 app.use('/dimensions', dimensionsRouter);
-app.use('/inventory', inventoryRouter); // Vérifiez le préfixe
-
+app.use('/explorer', explorationRouter);
 // Route de test DB
 app.get('/test-db', async (req, res) => {
     const pool = require('./config/db');

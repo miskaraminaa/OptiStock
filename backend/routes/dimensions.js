@@ -1,4 +1,3 @@
-// backend/routes/dimensions.js
 const express = require('express');
 const pool = require('../config/db');
 const multer = require('multer');
@@ -9,7 +8,14 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 console.log('Imported pool in dimensions.js:', pool ? 'Yes' : 'No');
 
-// Route to fetch unique article IDs (from Produit in le_tache)
+// Log all routes for debugging
+router.stack.forEach((layer) => {
+    if (layer.route) {
+        console.log(`[${new Date().toISOString()}] Registered route: ${layer.route.path} ${layer.route.methods}`);
+    }
+});
+
+// Route to fetch unique article IDs
 router.get('/ids', async (req, res) => {
     try {
         console.log('Querying database for IDs...');
@@ -41,7 +47,7 @@ router.get('/', async (req, res) => {
 });
 
 // Route to update or insert dimensions
-router.post('/', async (req, res) => {
+router.post('/', upload.none(), async (req, res) => { // Added upload.none() to handle non-file POST
     const { id_article, longueur, largeur, hauteur, poids, qte } = req.body;
 
     // Validation des entrées
@@ -128,6 +134,5 @@ router.post('/', async (req, res) => {
         return res.status(500).json({ message: 'Erreur serveur', error: error.message });
     }
 });
-
 
 module.exports = router;

@@ -8,7 +8,7 @@ import InboxArrowDownIcon from '@heroicons/react/24/outline/InboxArrowDownIcon';
 import KeyIcon from '@heroicons/react/24/outline/KeyIcon';
 import CubeIcon from '@heroicons/react/24/outline/CubeIcon';
 import ArrowPathIcon from '@heroicons/react/24/outline/ArrowPathIcon';
-import ClipboardDocumentListIcon from '@heroicons/react/24/outline/ClipboardDocumentListIcon'; // Nouvelle icône pour inventaire
+import ClipboardDocumentListIcon from '@heroicons/react/24/outline/ClipboardDocumentListIcon';
 
 // Lazy-loaded components
 const Dashboard = lazy(() => import('../pages/protected/Dashboard'));
@@ -17,7 +17,7 @@ const Charts = lazy(() => import('../pages/protected/Charts'));
 const Leads = lazy(() => import('../pages/protected/Leads'));
 const Dimensions = lazy(() => import('../pages/protected/Dimensions'));
 const Rotations = lazy(() => import('../pages/protected/Rotations'));
-const Inventory = lazy(() => import('../pages/protected/Inventory')); // Nouveau composant
+const Explorer = lazy(() => import('../pages/protected/Explorer'));
 
 const ForgotPassword = lazy(() => import('../pages/ForgotPassword'));
 
@@ -25,10 +25,10 @@ const iconClasses = `h-6 w-6`;
 const submenuIconClasses = `h-5 w-5`;
 
 const logoutUser = () => {
-    console.log('Déconnexion déclenchée');
+    console.log(`[${new Date().toISOString()}] Déconnexion déclenchée`);
     localStorage.clear();
-    console.log('Stockage local vidé :', localStorage);
-    window.location.href = '/login'; // Rediriger vers la page de connexion
+    console.log(`[${new Date().toISOString()}] Stockage local vidé :`, localStorage);
+    window.location.href = '/login';
 };
 
 const routes = [
@@ -63,10 +63,10 @@ const routes = [
         name: 'Calcul des rotations',
     },
     {
-        path: '/app/inventory', // Nouvelle route pour l'inventaire
-        component: Inventory,
-        icon: <ClipboardDocumentListIcon className={iconClasses} />, // Icône appropriée
-        name: 'Gestion de l\'Inventaire', // Nom clair
+        path: '/app/explorer',
+        component: Explorer,
+        icon: <ClipboardDocumentListIcon className={iconClasses} />,
+        name: 'Explorer Articles',
     },
     {
         path: '',
@@ -89,7 +89,7 @@ const routes = [
     },
     {
         path: null,
-        component: 'Déconnexion',
+        component: () => logoutUser(),
         icon: <ArrowLeftOnRectangleIcon className={iconClasses} />,
         name: 'Déconnexion',
         onClick: logoutUser,

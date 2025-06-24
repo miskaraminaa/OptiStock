@@ -12,6 +12,7 @@ import ChartBarIcon from '@heroicons/react/24/outline/ChartBarIcon';
 import InboxArrowDownIcon from '@heroicons/react/24/outline/InboxArrowDownIcon';
 import KeyIcon from '@heroicons/react/24/outline/KeyIcon';
 import DocumentDuplicateIcon from '@heroicons/react/24/outline/DocumentDuplicateIcon';
+import Explorer from '../pages/protected/Explorer';
 
 // Lazy-loaded components
 const Dashboard = lazy(() => import('../pages/protected/Dashboard'));
@@ -54,6 +55,12 @@ const routes = [
     component: Charts,
     icon: <ChartBarIcon className={iconClasses} />,
     name: 'Analytics',
+  },
+  {
+    path: '/app/explorer',
+    component: Explorer,
+    icon: <ChartBarIcon className={iconClasses} />,
+    name: 'Explorer',
   },
   {
     path: '',
