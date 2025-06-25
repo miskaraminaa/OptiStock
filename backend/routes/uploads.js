@@ -517,7 +517,7 @@ const columnMappings = {
         "Quantité": "quantite",
         "Unité Qté de Base": "unite_qte_base",
         "Type de Stock": "type_stock",
-        " type stock": "designation_type_stock",
+        "Désign. type stock": "designation_type_stock",
         "Groupe Valorisation": "groupe_valorisation",
         "Prix": "prix",
         "Valeur de Stock": "valeur_stock",

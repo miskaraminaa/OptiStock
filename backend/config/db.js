@@ -7,7 +7,10 @@ const pool = mysql.createPool({
     database: process.env.DB_NAME,
     waitForConnections: true,
     connectionLimit: 10,
-    queueLimit: 0
+    queueLimit: 0,
+    supportBigNumbers: true,
+    bigNumberStrings: true,
+    dateStrings: true
 });
 
 console.log('Pool created:', pool ? 'Yes' : 'No');

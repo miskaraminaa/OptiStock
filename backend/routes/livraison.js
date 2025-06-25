@@ -64,6 +64,20 @@ router.post('/process', async (req, res) => {
         const params = [fileName];
         const sub = stock === 'Terminée' ? '=' : '!=';
 
+        // Debugging query for product 80001093
+        if (value === '80001093') {
+            const debugQuery = `
+                SELECT t.Produit, s.name_file, d.id_article, d.longueur, d.largeur, d.hauteur, d.poids, d.volume
+                FROM stockmagasin.le_tache t
+                JOIN stockmagasin.le_status s ON t.Document = s.document
+                LEFT JOIN stockmagasin.dimensions d ON TRIM(t.Produit) = TRIM(d.id_article)
+                WHERE t.Produit = ? AND s.name_file = ?
+            `;
+            console.log('Debugging product 80001093 for fileName:', fileName);
+            const [debugResults] = await pool.query(debugQuery, ['80001093', fileName]);
+            console.log('Debug results for 80001093:', debugResults);
+        }
+
         if (type === 'LE') {
             query = `
                 SELECT DISTINCT
@@ -76,25 +90,21 @@ router.post('/process', async (req, res) => {
                     t.Emplacement_prenant,
                     t.Qte_reelle_pren_UQA AS Quantite,
                     t.Qte_ecart_pren_UQA AS quantite_ecart,
-                    t.Poids_chargement AS poids,
-                    t.Volume_chargement AS volume,
+                    d.poids AS poids,              
+                    d.volume AS volume,            
                     s.statut_activite_magasin AS statut_entree_stock,
-                    NULL AS famille,
-                    NULL AS libelle_produit,
-                    NULL AS longueur,
-                    NULL AS largeur,
-                    NULL AS hauteur,
-                    NULL AS poids_global,
-                    NULL AS volume_quantite,
-                    NULL AS manutention,
-                    NULL AS Type_Rayon,
-                    NULL AS Plant_Storage,
-                    NULL AS Emplacement_EWM_Qte,
-                    NULL AS quantit
+                    d.longueur AS longueur,
+                    d.largeur AS largeur,
+                    d.hauteur AS hauteur,
+                    d.poids_global AS poids_global,       
+                    d.volume_quantite AS volume_quantite,   
+                    d.manutention AS manutention,
+                    d.Type_Rayon AS Type_Rayon,
                 FROM stockmagasin.le_status s
                 LEFT JOIN stockmagasin.le_tache t ON s.document = t.Document
-                WHERE s.name_file = ?${value ? ' AND t.Produit = ?' : ''}${stock && stock !== 'Tous les statuts' ? ` AND s.statut_activite_magasin ${sub} 'Terminée'` : ''
-                }`;
+                LEFT JOIN stockmagasin.dimensions d ON TRIM(t.Produit) = TRIM(d.id_article)
+                WHERE s.name_file = ?${value ? ' AND t.Produit = ?' : ''}${stock && stock !== 'Tous les statuts' ? ` AND s.statut_activite_magasin ${sub} 'Terminée'` : ''};
+            `;
             if (value) params.push(value);
         } else if (type === 'LS') {
             query = `

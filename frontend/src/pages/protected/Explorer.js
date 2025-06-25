@@ -15,9 +15,13 @@ const Explorer = () => {
     useEffect(() => {
         const fetchArticles = async (retryCount = 3, delay = 1000) => {
             const token = localStorage.getItem('token');
+            console.log('Token:', token);
             if (!token) {
-                setError('No session found. Please log in.');
+                setError('No session found. Redirecting to login...');
                 setLoading(false);
+                setTimeout(() => {
+                    window.location.href = '/login';
+                }, 2000);
                 return;
             }
 
@@ -25,8 +29,9 @@ const Explorer = () => {
                 try {
                     const response = await axios.get(`${API_URL}/explorer`, {
                         headers: { Authorization: `Bearer ${token}` },
-                        timeout: 30000, // Increased timeout to 30 seconds
+                        timeout: 30000,
                     });
+                    console.log('API Response:', response.data.data); // Log full API response
                     if (!response.data || !response.data.data) {
                         throw new Error('Invalid response data');
                     }
@@ -35,13 +40,23 @@ const Explorer = () => {
                     setLoading(false);
                     return;
                 } catch (err) {
+                    const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch articles';
+                    console.error(`[${new Date().toISOString()}] API Error (Attempt ${attempt}):`, err.response?.data || err.message);
+
+                    if (err.response?.status === 401 || errorMessage.toLowerCase().includes('token')) {
+                        setError('Session expired. Redirecting to login...');
+                        localStorage.removeItem('token');
+                        setLoading(false);
+                        setTimeout(() => {
+                            window.location.href = '/login';
+                        }, 2000);
+                        return;
+                    }
+
                     if (attempt === retryCount) {
-                        const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch articles';
                         setError(errorMessage.includes('404') ? 'Resource not found' : errorMessage);
-                        console.error(`[${new Date().toISOString()}] API Error (Attempt ${attempt}):`, err.response?.data || err.message);
                         setLoading(false);
                     } else {
-                        // Wait before retrying
                         await new Promise(resolve => setTimeout(resolve, delay));
                         console.log(`Retrying... Attempt ${attempt + 1}/${retryCount}`);
                     }
@@ -53,12 +68,23 @@ const Explorer = () => {
     }, []);
 
     useEffect(() => {
-        const filtered = articles.filter(article =>
-            (article.article?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                article.type_stock?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                article.designation_type_stock?.toLowerCase().includes(searchTerm.toLowerCase())) &&
-            (filterType === '' || article.type_stock === filterType)
-        );
+        console.log('Articles before filtering:', articles); // Log articles state
+        const filtered = articles.filter(article => {
+            const articleStr = article.article ? article.article.toString() : '';
+            const typeStockStr = article.type_stock?.toLowerCase() || '';
+            const designationStr = article.designation_type_stock?.toLowerCase() || '';
+            const searchLower = searchTerm.toLowerCase();
+
+            const matchesSearch =
+                articleStr.includes(searchLower) ||
+                typeStockStr.includes(searchLower) ||
+                designationStr.includes(searchLower);
+
+            const matchesFilter = filterType === '' || article.type_stock === filterType;
+
+            return matchesSearch && matchesFilter;
+        });
+        console.log('Filtered Articles:', filtered); // Log filtered results
         setFilteredArticles(filtered);
         setCurrentPage(1);
     }, [searchTerm, filterType, articles]);
@@ -69,15 +95,11 @@ const Explorer = () => {
     const totalPages = Math.ceil(filteredArticles.length / articlesPerPage);
 
     const handleNextPage = () => {
-        if (currentPage < totalPages) {
-            setCurrentPage(currentPage + 1);
-        }
+        if (currentPage < totalPages) setCurrentPage(currentPage + 1);
     };
 
     const handlePrevPage = () => {
-        if (currentPage > 1) {
-            setCurrentPage(currentPage - 1);
-        }
+        if (currentPage > 1) setCurrentPage(currentPage - 1);
     };
 
     const uniqueStockTypes = [...new Set(articles.map(article => article.type_stock).filter(Boolean))];
@@ -95,16 +117,18 @@ const Explorer = () => {
         <div className="flex items-center justify-center h-screen bg-gradient-to-b from-gray-50 to-gray-100">
             <div className="text-center bg-white p-8 rounded-xl shadow-lg">
                 <p className="text-xl font-semibold text-red-600 mb-4">{error}</p>
-                <button
-                    className="px-6 py-2 bg-gray-300 text-gray-900 rounded-lg hover:bg-gray-400 transition duration-300"
-                    onClick={() => {
-                        setLoading(true);
-                        setError(null);
-                        window.location.reload();
-                    }}
-                >
-                    Retry
-                </button>
+                {error.includes('Redirecting') ? null : (
+                    <button
+                        className="px-6 py-2 bg-gray-300 text-gray-900 rounded-lg hover:bg-gray-400 transition duration-300"
+                        onClick={() => {
+                            setLoading(true);
+                            setError(null);
+                            window.location.reload();
+                        }}
+                    >
+                        Retry
+                    </button>
+                )}
             </div>
         </div>
     );
@@ -144,21 +168,23 @@ const Explorer = () => {
                                     <thead>
                                         <tr className="bg-gray-200 text-gray-900">
                                             {[
-                                                'Article',
+                                                'SAP code',
+                                                'Désignation Article',
+                                                'Numéro Magasin',
+                                                'Division',
+                                                'Magasin',
+                                                'Emplacement',
+                                                'Type Magasin',
                                                 'Quantité',
+                                                'Unité Qté Base',
                                                 'Type de Stock',
                                                 'Désignation Type Stock',
+                                                'Groupe Valorisation',
+                                                'Prix',
                                                 'Valeur Stock',
-                                                'LE Produit',
-                                                'LE Document',
-                                                'LE Statut Tâche',
-                                                'LE Statut Activité',
-                                                'LE Statut Prélèvement',
-                                                'LS Produit',
-                                                'LS Document',
-                                                'LS Statut Tache',
-                                                'LS Statut Activité',
-                                                'LS Statut Prélèvement'
+                                                'Devise',
+                                                'Statut Tâche Magasin',
+                                                'Statut Activité Magasin'
                                             ].map((header) => (
                                                 <th key={header} className="px-4 py-3 text-left text-sm font-semibold tracking-wide">
                                                     {header}
@@ -173,20 +199,22 @@ const Explorer = () => {
                                                 className={`transition duration-200 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100`}
                                             >
                                                 <td className="px-4 py-3 text-sm text-gray-600">{article.article || 'N/A'}</td>
+                                                <td className="px-4 py-3 text-sm text-gray-600">{article.designation_article || 'N/A'}</td>
+                                                <td className="px-4 py-3 text-sm text-gray-600">{article.numero_magasin || 'N/A'}</td>
+                                                <td className="px-4 py-3 text-sm text-gray-600">{article.division || 'N/A'}</td>
+                                                <td className="px-4 py-3 text-sm text-gray-600">{article.magasin || 'N/A'}</td>
+                                                <td className="px-4 py-3 text-sm text-gray-600">{article.emplacement || 'N/A'}</td>
+                                                <td className="px-4 py-3 text-sm text-gray-600">{article.type_magasin || 'N/A'}</td>
                                                 <td className="px-4 py-3 text-sm text-gray-600">{article.quantite || 'N/A'}</td>
+                                                <td className="px-4 py-3 text-sm text-gray-600">{article.unite_qte_base || 'N/A'}</td>
                                                 <td className="px-4 py-3 text-sm text-gray-600">{article.type_stock || 'N/A'}</td>
                                                 <td className="px-4 py-3 text-sm text-gray-600">{article.designation_type_stock || 'N/A'}</td>
+                                                <td className="px-4 py-3 text-sm text-gray-600">{article.groupe_valorisation || 'N/A'}</td>
+                                                <td className="px-4 py-3 text-sm text-gray-600">{article.prix || 'N/A'}</td>
                                                 <td className="px-4 py-3 text-sm text-gray-600">{article.valeur_stock || 'N/A'}</td>
-                                                <td className="px-4 py-3 text-sm text-gray-600">{article.Produit || 'N/A'}</td>
-                                                <td className="px-4 py-3 text-sm text-gray-600">{article.Document || 'N/A'}</td>
+                                                <td className="px-4 py-3 text-sm text-gray-600">{article.devise || 'N/A'}</td>
                                                 <td className="px-4 py-3 text-sm text-gray-600">{article.Statut_tache_magasin || 'N/A'}</td>
-                                                <td className="px-4 py-3 text-sm text-gray-600">{article.le_statut_activite || 'N/A'}</td>
-                                                <td className="px-4 py-3 text-sm text-gray-600">{article.le_statut_prelevement || 'N/A'}</td>
-                                                <td className="px-4 py-3 text-sm text-gray-600">{article.ls_produit || 'N/A'}</td>
-                                                <td className="px-4 py-3 text-sm text-gray-600">{article.ls_document || 'N/A'}</td>
-                                                <td className="px-4 py-3 text-sm text-gray-600">{article.ls_statut_tache || 'N/A'}</td>
-                                                <td className="px-4 py-3 text-sm text-gray-600">{article.ls_statut_activite || 'N/A'}</td>
-                                                <td className="px-4 py-3 text-sm text-gray-600">{article.ls_statut_prelevement || 'N/A'}</td>
+                                                <td className="px-4 py-3 text-sm text-gray-600">{article.Statut_activite_magasin || 'N/A'}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -200,66 +228,23 @@ const Explorer = () => {
                                     className="bg-white bg-opacity-80 backdrop-blur-md rounded-xl shadow-lg p-6 transition duration-300 hover:bg-opacity-100"
                                 >
                                     <div className="grid grid-cols-2 gap-4 text-sm">
-                                        <div>
-                                            <span className="font-semibold text-gray-700">Article:</span>
-                                            <p className="text-gray-900">{article.article || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="font-semibold text-gray-700">Quantité:</span>
-                                            <p className="text-gray-900">{article.quantite || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="font-semibold text-gray-700">Type de Stock:</span>
-                                            <p className="text-gray-900">{article.type_stock || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="font-semibold text-gray-700">Désignation:</span>
-                                            <p className="text-gray-900">{article.designation_type_stock || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="font-semibold text-gray-700">Valeur Stock:</span>
-                                            <p className="text-gray-900">{article.valeur_stock || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="font-semibold text-gray-700">LE Produit:</span>
-                                            <p className="text-gray-900">{article.Produit || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="font-semibold text-gray-700">LE Document:</span>
-                                            <p className="text-gray-900">{article.Document || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="font-semibold text-gray-700">LE Statut Tâche:</span>
-                                            <p className="text-gray-900">{article.Statut_tache_magasin || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="font-semibold text-gray-700">LE Statut Activité:</span>
-                                            <p className="text-gray-900">{article.le_statut_activite || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="font-semibold text-gray-700">LE Statut Prélèvement:</span>
-                                            <p className="text-gray-900">{article.le_statut_prelevement || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="font-semibold text-gray-700">LS Produit:</span>
-                                            <p className="text-gray-900">{article.ls_produit || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="font-semibold text-gray-700">LS Document:</span>
-                                            <p className="text-gray-900">{article.ls_document || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="font-semibold text-gray-700">LS Statut Tache:</span>
-                                            <p className="text-gray-900">{article.ls_statut_tache || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="font-semibold text-gray-700">LS Statut Activité:</span>
-                                            <p className="text-gray-900">{article.ls_statut_activite || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="font-semibold text-gray-700">LS Statut Prélèvement:</span>
-                                            <p className="text-gray-900">{article.ls_statut_prelevement || 'N/A'}</p>
-                                        </div>
+                                        <div><span className="font-semibold text-gray-700">SAP code:</span><p className="text-gray-900">{article.article || 'N/A'}</p></div>
+                                        <div><span className="font-semibold text-gray-700">Désignation Article:</span><p className="text-gray-900">{article.designation_article || 'N/A'}</p></div>
+                                        <div><span className="font-semibold text-gray-700">Numéro Magasin:</span><p className="text-gray-900">{article.numero_magasin || 'N/A'}</p></div>
+                                        <div><span className="font-semibold text-gray-700">Division:</span><p className="text-gray-900">{article.division || 'N/A'}</p></div>
+                                        <div><span className="font-semibold text-gray-700">Magasin:</span><p className="text-gray-900">{article.magasin || 'N/A'}</p></div>
+                                        <div><span className="font-semibold text-gray-700">Emplacement:</span><p className="text-gray-900">{article.emplacement || 'N/A'}</p></div>
+                                        <div><span className="font-semibold text-gray-700">Type Magasin:</span><p className="text-gray-900">{article.type_magasin || 'N/A'}</p></div>
+                                        <div><span className="font-semibold text-gray-700">Quantité:</span><p className="text-gray-900">{article.quantite || 'N/A'}</p></div>
+                                        <div><span className="font-semibold text-gray-700">Unité Qté Base:</span><p className="text-gray-900">{article.unite_qte_base || 'N/A'}</p></div>
+                                        <div><span className="font-semibold text-gray-700">Type de Stock:</span><p className="text-gray-900">{article.type_stock || 'N/A'}</p></div>
+                                        <div><span className="font-semibold text-gray-700">Désignation Type Stock:</span><p className="text-gray-900">{article.designation_type_stock || 'N/A'}</p></div>
+                                        <div><span className="font-semibold text-gray-700">Groupe Valorisation:</span><p className="text-gray-900">{article.groupe_valorisation || 'N/A'}</p></div>
+                                        <div><span className="font-semibold text-gray-700">Prix:</span><p className="text-gray-900">{article.prix || 'N/A'}</p></div>
+                                        <div><span className="font-semibold text-gray-700">Valeur Stock:</span><p className="text-gray-900">{article.valeur_stock || 'N/A'}</p></div>
+                                        <div><span className="font-semibold text-gray-700">Devise:</span><p className="text-gray-900">{article.devise || 'N/A'}</p></div>
+                                        <div><span className="font-semibold text-gray-700">Statut Tâche Magasin:</span><p className="text-gray-900">{article.Statut_tache_magasin || 'N/A'}</p></div>
+                                        <div><span className="font-semibold text-gray-700">Statut Activité Magasin:</span><p className="text-gray-900">{article.Statut_activite_magasin || 'N/A'}</p></div>
                                     </div>
                                 </div>
                             ))}
@@ -268,13 +253,11 @@ const Explorer = () => {
                             <button
                                 onClick={handlePrevPage}
                                 disabled={currentPage === 1}
-                                className={`px-4 py-2 rounded-lg ${currentPage === 1 ? 'bg-gray- XD2-300 text-gray-500 cursor-not-allowed' : 'bg-gray-300 text-gray-900 hover:bg-gray-400'} transition duration-300`}
+                                className={`px-4 py-2 rounded-lg ${currentPage === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gray-300 text-gray-900 hover:bg-gray-400'} transition duration-300`}
                             >
                                 ← Previous
                             </button>
-                            <span className="text-gray-600">
-                                Page {currentPage} of {totalPages}
-                            </span>
+                            <span className="text-gray-600">Page {currentPage} of {totalPages}</span>
                             <button
                                 onClick={handleNextPage}
                                 disabled={currentPage === totalPages}

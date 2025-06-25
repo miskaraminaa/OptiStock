@@ -20,6 +20,7 @@ const Livraison = () => {
     });
     const [selectedItems, setSelectedItems] = useState(new Set());
     const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+    const [isLoadingData, setIsLoadingData] = useState(false);
     const [error, setError] = useState(null);
     const [showAddForm, setShowAddForm] = useState(false);
     const [newItem, setNewItem] = useState({});
@@ -32,26 +33,22 @@ const Livraison = () => {
         { header: "Statut Tâche Magasin", key: "Statut_tache_magasin" },
         { header: "Produit", key: "Produit" },
         { header: "Désignation Article", key: "designation_article" },
-        { header: "Famille", key: "famille" },
-        { header: "Libellé Produit", key: "libelle_produit" },
         { header: "Longueur", key: "longueur" },
         { header: "Largeur", key: "largeur" },
         { header: "Hauteur", key: "hauteur" },
         { header: "Volume", key: "volume" },
         { header: "Poids", key: "poids" },
         { header: "Quantité", key: "Quantite" },
-        { header: "Poids Global", key: "poids_global" },
-        { header: "Volume/Quantité", key: "volume_quantite" },
+        { header: "Poids Global", key: "poids_global" }, // Adjusted to match backend alias
+        { header: "Volume/Quantité", key: "volume_quantite" }, // Adjusted to match backend alias
         { header: "Manutention", key: "manutention" },
         { header: "Type Rayon", key: "Type_Rayon" },
-        { header: "Plant-SLC", key: "Plant_Storage" },
         { header: "Emplacement Cédant", key: "emplacement_cedant" },
         { header: "Emplacement Prenant", key: "Emplacement_prenant" },
         { header: "Emplacement Final EWM/Qte", key: "Emplacement_EWM_Qte", style: { width: '200px' } },
         { header: "Qte Théo Céd UQA", key: "Qte_theo_ced_UQA" },
-        { header: "Quantité Entrante", key: "quantit" },
         { header: "Qté Écart", key: "quantite_ecart" },
-        { header: "Statut Activité Magasin", key: "statut_entree_stock" }, // Renommé pour plus de clarté
+        { header: "Statut Activité Magasin", key: "statut_entree_stock" },
     ];
 
     const LS_COLUMNS = [
@@ -59,16 +56,13 @@ const Livraison = () => {
         { header: "Statut", key: "Statut_tache_magasin" },
         { header: "Produit", key: "Produit" },
         { header: "Désignation", key: "designation_article" },
-        { header: "Famille", key: "famille" },
-        { header: "Libellé Produit", key: "libelle_produit" },
-        { header: "Plant-SLC", key: "Plant_Storage" },
         { header: "Emplacement Cédant", key: "Emplacement_cedant" },
         { header: "Emplacement Prenant", key: "Emplacement_prenant" },
         { header: "Emplacement EWM/Qte", key: "Emplacement_EWM_Qte" },
         { header: "Qte Théo Céd UQA", key: "Qte_theo_ced_UQA" },
         { header: "Quantité", key: "quantit" },
         { header: "Qté Écart", key: "quantite_ecart" },
-        { header: "Statut Activité Magasin", key: "statut_entree_stock" }, // Renommé pour plus de clarté
+        { header: "Statut Activité Magasin", key: "statut_entree_stock" },
     ];
 
     // Récupérer les noms de fichiers disponibles
@@ -86,32 +80,29 @@ const Livraison = () => {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ type: selectedType }),
                 });
-                console.log(`Statut de la réponse : ${res.status}, URL : ${url}`);
                 if (!res.ok) {
                     const errorText = await res.text();
                     throw new Error(`Erreur HTTP ! statut : ${res.status}, message : ${errorText}`);
                 }
                 const data = await res.json();
-                console.log(`Fichiers reçus :`, data.files);
                 setFileNames(data.files || []);
-                setIsLoadingFiles(false);
                 if (data.files.length === 0) {
                     setError(`Aucun fichier disponible pour le type ${selectedType}.`);
                 }
             } catch (err) {
                 console.error("Erreur lors de la récupération des fichiers :", err);
                 setError(`Échec du chargement des noms de fichiers : ${err.message}`);
+            } finally {
                 setIsLoadingFiles(false);
             }
         };
-        if (selectedType) {
-            fetchFiles();
-        }
+        if (selectedType) fetchFiles();
     }, [BASE_URL, selectedType]);
 
-    // Récupérer les données en fonction du fichier sélectionné et des filtres
+    // Récupérer et filtrer les données
     useEffect(() => {
         const fetchData = async () => {
+            setIsLoadingData(true);
             setError(null);
             const url = `${BASE_URL}/livraison/process`;
             const payload = {
@@ -127,20 +118,36 @@ const Livraison = () => {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload),
                 });
-                console.log(`Statut de la réponse : ${res.status}, URL : ${url}`);
                 if (!res.ok) {
                     const errorText = await res.text();
                     throw new Error(`Erreur HTTP ! statut : ${res.status}, message : ${errorText}`);
                 }
                 const data = await res.json();
-                console.log(`Données reçues :`, data);
                 setData(data);
-                setFilteredData(data);
+                applyFilters(data); // Apply filters immediately after fetching
             } catch (err) {
                 console.error("Erreur lors de la récupération des données :", err);
-                setError(`Échec du chargement des données pour le fichier sélectionné : ${err.message}`);
+                setError(`Échec du chargement des données : ${err.message}`);
+            } finally {
+                setIsLoadingData(false);
             }
         };
+
+        const applyFilters = (data) => {
+            let filtered = [...data];
+            if (filters.articleCode) {
+                filtered = filtered.filter((item) =>
+                    item.Produit?.toString().toLowerCase().includes(filters.articleCode.toLowerCase())
+                );
+            }
+            if (filters.status && filters.status !== "Tous les statuts") {
+                filtered = filtered.filter((item) =>
+                    item.statut_entree_stock?.toLowerCase() === filters.status.toLowerCase()
+                );
+            }
+            setFilteredData(filtered);
+        };
+
         if (selectedFile && selectedType) {
             fetchData();
         } else {
@@ -179,8 +186,8 @@ const Livraison = () => {
                 itemToAdd.volume = newItem.volume || "100000";
                 itemToAdd.poids = newItem.poids || "10";
                 itemToAdd.Quantite = newItem.Quantite || "100";
-                itemToAdd.poids_global = newItem.poids_global || "1000";
-                itemToAdd.volume_quantite = newItem.volume_quantite || "1000";
+                itemToAdd["Poids global"] = newItem.poids_global || "1000"; // Match backend alias
+                itemToAdd["Volume quantite"] = newItem.volume_quantite || "1000"; // Match backend alias
                 itemToAdd.manutention = newItem.manutention || "Manuel";
                 itemToAdd.Type_Rayon = newItem.Type_Rayon || "Standard";
             }
@@ -243,7 +250,7 @@ const Livraison = () => {
                             setSelectedFile("");
                             setFileNames([]);
                             setError(null);
-                            setShowAddForm(false); // Réinitialiser le formulaire lorsque le type change
+                            setShowAddForm(false);
                             setNewItem({});
                         }}
                         className="p-2 border rounded"
@@ -256,7 +263,7 @@ const Livraison = () => {
                         onChange={(e) => {
                             setSelectedFile(e.target.value);
                             setError(null);
-                            setShowAddForm(false); // Réinitialiser le formulaire lorsque le fichier change
+                            setShowAddForm(false);
                             setNewItem({});
                         }}
                         className="p-2 border rounded"
@@ -286,31 +293,39 @@ const Livraison = () => {
                         className="p-2 border rounded"
                     />
                 </div>
-                {error && <div className="text-red-500 mb-4">{error}</div>}
+                {(error || isLoadingFiles || isLoadingData) && (
+                    <div className="mb-4">
+                        {isLoadingFiles && <div className="text-blue-500">Chargement des fichiers...</div>}
+                        {isLoadingData && <div className="text-blue-500">Chargement des données...</div>}
+                        {error && <div className="text-red-500">{error}</div>}
+                    </div>
+                )}
                 <div className="flex space-x-2 mb-4">
                     <button
                         onClick={() => setShowAddForm(!showAddForm)}
                         className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
-                        disabled={!selectedFile}
+                        disabled={!selectedFile || isLoadingData}
                     >
                         {showAddForm ? "Annuler" : "Ajouter"}
                     </button>
                     <button
                         onClick={() => updateItems("remove")}
                         className="bg-red-500 text-white p-2 rounded hover:bg-red-600"
-                        disabled={selectedItems.size === 0}
+                        disabled={selectedItems.size === 0 || isLoadingData}
                     >
                         Retirer
                     </button>
                     <button
                         onClick={exportToExcel}
                         className="bg-green-500 text-white p-2 rounded hover:bg-green-600"
+                        disabled={isLoadingData}
                     >
                         Exporter Excel
                     </button>
                     <button
                         onClick={handlePrint}
                         className="bg-yellow-500 text-white p-2 rounded hover:bg-yellow-600"
+                        disabled={isLoadingData}
                     >
                         Imprimer
                     </button>
@@ -348,20 +363,8 @@ const Livraison = () => {
                                 onChange={(e) => setNewItem({ ...newItem, designation_article: e.target.value })}
                                 className="p-2 border rounded"
                             />
-                            <input
-                                type="text"
-                                placeholder="Famille"
-                                value={newItem.famille || ""}
-                                onChange={(e) => setNewItem({ ...newItem, famille: e.target.value })}
-                                className="p-2 border rounded"
-                            />
-                            <input
-                                type="text"
-                                placeholder="Libellé Produit"
-                                value={newItem.libelle_produit || ""}
-                                onChange={(e) => setNewItem({ ...newItem, libelle_produit: e.target.value })}
-                                className="p-2 border rounded"
-                            />
+                           
+                            
                             {selectedType === 'LE' && (
                                 <>
                                     <input
@@ -409,15 +412,15 @@ const Livraison = () => {
                                     <input
                                         type="number"
                                         placeholder="Poids Global"
-                                        value={newItem.poids_global || ""}
-                                        onChange={(e) => setNewItem({ ...newItem, poids_global: e.target.value })}
+                                        value={newItem["Poids global"] || ""}
+                                        onChange={(e) => setNewItem({ ...newItem, "Poids global": e.target.value })}
                                         className="p-2 border rounded"
                                     />
                                     <input
                                         type="number"
                                         placeholder="Volume/Quantité"
-                                        value={newItem.volume_quantite || ""}
-                                        onChange={(e) => setNewItem({ ...newItem, volume_quantite: e.target.value })}
+                                        value={newItem["Volume quantite"] || ""}
+                                        onChange={(e) => setNewItem({ ...newItem, "Volume quantite": e.target.value })}
                                         className="p-2 border rounded"
                                     />
                                     <input
@@ -436,13 +439,7 @@ const Livraison = () => {
                                     />
                                 </>
                             )}
-                            <input
-                                type="text"
-                                placeholder="Plant_Storage"
-                                value={newItem.Plant_Storage || ""}
-                                onChange={(e) => setNewItem({ ...newItem, Plant_Storage: e.target.value })}
-                                className="p-2 border rounded"
-                            />
+                        
                             <input
                                 type="text"
                                 placeholder={selectedType === 'LE' ? "Emplacement Cédant" : "Emplacement Cédant"}
@@ -506,6 +503,7 @@ const Livraison = () => {
                             <button
                                 type="submit"
                                 className="col-span-2 bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
+                                disabled={isLoadingData}
                             >
                                 Ajouter l'article
                             </button>
@@ -526,6 +524,7 @@ const Livraison = () => {
                                                     : new Set()
                                             )
                                         }
+                                        disabled={isLoadingData}
                                     />
                                 </th>
                                 {columns.map((col) => (
@@ -547,17 +546,19 @@ const Livraison = () => {
                                             type="checkbox"
                                             checked={selectedItems.has(index)}
                                             onChange={() => toggleItem(index)}
+                                            disabled={isLoadingData}
                                         />
                                     </td>
                                     {columns.map((col) => (
                                         <td key={col.key} className="px-4 py-2" style={col.style || {}}>
-                                            {row[col.key] || ""}
+                                            {row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : ""}
                                         </td>
                                     ))}
                                     <td className="px-4 py-2">
                                         <button
                                             onClick={() => handleDelete(index)}
                                             className="text-red-500 hover:text-red-700"
+                                            disabled={isLoadingData}
                                         >
                                             <TrashIcon className="h-5 w-5" />
                                         </button>
