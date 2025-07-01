@@ -99,7 +99,7 @@ router.post('/process', async (req, res) => {
                     d.poids_global AS poids_global,       
                     d.volume_quantite AS volume_quantite,   
                     d.manutention AS manutention,
-                    d.Type_Rayon AS Type_Rayon,
+                    d.Type_Rayon AS Type_Rayon
                 FROM stockmagasin.le_status s
                 LEFT JOIN stockmagasin.le_tache t ON s.document = t.Document
                 LEFT JOIN stockmagasin.dimensions d ON TRIM(t.Produit) = TRIM(d.id_article)

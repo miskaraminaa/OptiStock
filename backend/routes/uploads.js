@@ -13,7 +13,7 @@ router.use(cors({ origin: 'http://localhost:3000', credentials: true }));
 
 // Set request timeout (30 seconds)
 router.use((req, res, next) => {
-    res.setTimeout(30000, () => {
+    res.setTimeout(3000000, () => {
         console.error('Request timed out');
         return res.status(504).json({ message: 'Request timed out' });
     });
@@ -74,7 +74,7 @@ const fileTypeToTable = {
 const columnMappings = {
     le_status: {
         "Bloqué (global)": "bloque_global",
-        "Document": "document",
+        "Document": "Document",
         "Type de document": "type_document",
         "Description du type de document": "description_type_document",
         "Généré manuellement": "genere_manuellement",
@@ -250,7 +250,10 @@ const columnMappings = {
     },
     ls_status: {
         "Bloqué (global)": "bloque_global",
-        "Document": "document",
+        "Bloque (global)": "bloque_global", // Handle alternate spelling
+        "Bloqué (global) ": "bloque_global", // Handle trailing space
+        "Document": "Document",
+        "document": "Document", // Handle lowercase
         "Type de document": "type_document",
         "Description du type de document": "description_type_document",
         "Généré manuellement": "genere_manuellement",
@@ -307,9 +310,23 @@ const columnMappings = {
         "Statut sortie march. et répartition": "statut_sortie_marchandises_repartition",
         "Créé le": "cree_le",
         "Créé(e) à": "cree_a",
+        "Cree(e) a": "cree_a", // Handle alternate formatting
         "Numéro de séquence": "numero_sequence",
         "Pertinence des marchandises dangereuses": "pertinence_marchandises_dangereuses",
-        "Créé par": "cree_par"
+        "Créé par": "cree_par",
+        // Handle trailing spaces
+        "Bloqué (global) ": "bloque_global",
+        "Document ": "Document",
+        "Nombre de postes ": "nombre_postes",
+        "Statut activité magasin ": "statut_activite_magasin",
+        "Statut du prélèvement ": "statut_prelevement",
+        "Statut sortie de marchandises ": "statut_sortie_marchandises",
+        "Terminé ": "termine",
+        "Commande client ": "commande_client",
+        "Commande d'achat ": "commande_achat",
+        "Créé le ": "cree_le",
+        "Créé(e) à ": "cree_a",
+        "Créé par ": "cree_par"
     },
     ls_tache: {
         "Tâche magasin": "Tache_magasin",
@@ -557,19 +574,23 @@ const sanitizeFileName = (fileName) => {
         .trim();
 };
 
-// Helper function to sanitize data
 const sanitizeValue = (value, columnType, columnName, tableName) => {
     if (value === '' || value === null || value === undefined) {
         return null;
     }
-    if (tableName === 'le_tache') {
-        const strValue = String(value).trim();
-        if (columnType.includes('varchar')) {
-            const maxLength = parseInt(columnType.match(/varchar\((\d+)\)/)?.[1] || 255);
-            return strValue.length > maxLength ? strValue.substring(0, maxLength) : strValue;
+
+    if (tableName === 'stock_ewm' && columnName === 'date_em' && typeof value === 'string') {
+        // Convertir la chaîne au format dd.MM.yyyy HH:mm:ss en date ISO
+        const dateMatch = value.match(/^(\d{2})\.(\d{2})\.(\d{4}) (\d{2}):(\d{2}):(\d{2})$/);
+        if (dateMatch) {
+            const [, day, month, year, hour, minute, second] = dateMatch;
+            const date = new Date(`${year}-${month}-${day} ${hour}:${minute}:${second}`);
+            return date.toISOString().split('T')[0]; // Retourne yyyy-MM-dd
         }
-        return strValue;
+        console.warn(`Invalid date format for ${columnName} value ${value}`);
+        return null;
     }
+
     if (columnType.includes('date') && typeof value === 'number') {
         try {
             const date = excelDateToJSDate(value);
@@ -579,6 +600,8 @@ const sanitizeValue = (value, columnType, columnName, tableName) => {
             return null;
         }
     }
+
+    // Autres cas existants (time, tinyint, int, etc.)
     if (columnType.includes('time') && typeof value === 'string') {
         const timeMatch = value.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(AM|PM))?$/i);
         if (timeMatch) {
@@ -594,6 +617,7 @@ const sanitizeValue = (value, columnType, columnName, tableName) => {
         }
         return null;
     }
+
     if (columnType.includes('tinyint') || columnType.includes('boolean')) {
         if (typeof value === 'boolean') return value ? 1 : 0;
         if (typeof value === 'string') {
@@ -603,10 +627,12 @@ const sanitizeValue = (value, columnType, columnName, tableName) => {
         }
         return value ? 1 : 0;
     }
+
     if (columnType.includes('int') || columnType.includes('decimal') || columnType.includes('float')) {
         const numValue = parseFloat(value);
         return isNaN(numValue) ? null : numValue;
     }
+
     if (columnType.includes('varchar') || columnType.includes('text')) {
         const strValue = String(value).trim();
         if (columnType.includes('varchar')) {
@@ -973,6 +999,69 @@ router.post('/test-normalize', authenticate, async (req, res) => {
     }
 });
 
+
+// POST route pour exporter stock_ewm vers Excel
+router.post('/export/stock_ewm', authenticate, async (req, res) => {
+    console.log('Starting POST /uploads/export/stock_ewm');
+    try {
+        // Récupérer les données de stock_ewm
+        const [rows] = await db.query('SELECT * FROM stock_ewm');
+
+        if (!rows || rows.length === 0) {
+            console.log('No data found in stock_ewm');
+            return res.status(404).json({ message: 'No data found in stock_ewm' });
+        }
+
+        // Préparer les données pour Excel
+        const data = rows.map(row => ({
+            Article: row.article,
+            "Désignation Article": row.designation_article,
+            "Numéro de Magasin": row.numero_magasin,
+            Division: row.division,
+            Magasin: row.magasin,
+            Emplacement: row.emplacement,
+            "Type de Magasin": row.type_magasin,
+            Quantité: row.quantite,
+            "Unité Qté de Base": row.unite_qte_base,
+            "Type de Stock": row.type_stock,
+            "Désign. type stock": row.designation_type_stock,
+            "Groupe Valorisation": row.groupe_valorisation,
+            Prix: row.prix,
+            "Valeur de Stock": row.valeur_stock,
+            Devise: row.devise,
+            "Date EM": row.date_em ? new Date(row.date_em).toLocaleDateString('fr-FR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            }) : null, // Format dd/MM/yyyy pour Excel
+            "Dernière Sortie": row.derniere_sortie
+        }));
+
+        // Créer un workbook
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(data);
+        XLSX.utils.book_append_sheet(wb, ws, 'Stock_EWM');
+
+        // Générer le fichier Excel
+        const fileName = `stock_ewm_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+        const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+        // Envoyer le fichier comme réponse
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        console.log(`Exporting file: ${fileName}`);
+        return res.status(200).send(buffer);
+
+    } catch (err) {
+        console.error('Error in POST /uploads/export/stock_ewm:', err);
+        return res.status(500).json({
+            message: 'Server error during export',
+            error: err.message,
+            code: err.code,
+            sql: err.sql
+        });
+    }
+});
 // Test insert endpoint
 router.post('/test-insert', authenticate, async (req, res) => {
     console.log('Starting POST /uploads/test-insert');

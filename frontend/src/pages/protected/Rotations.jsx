@@ -1,241 +1,144 @@
-import React, { useState, useEffect, useRef } from "react";
-import TitleCard from "../../components/Cards/TitleCard";
-import * as XLSX from "xlsx";
+import React, { useState } from 'react';
+import PropTypes from 'prop-types';
 
-const Rotations = () => {
-    const [movementFile, setMovementFile] = useState(null);
-    const [stockFile, setStockFile] = useState(null);
-    const [message, setMessage] = useState("");
-    const [rotations, setRotations] = useState({
-        plant: [],
-        slc: [],
-        wj01: [],
-    });
-    const tableRef = useRef(null);
+const INITIAL_DATA = [
+    { id: "10000010", totalExits: 2.60, averageStock: 10.50, turnoverRate: 0.25 },
+    { id: "10000114", totalExits: 830.70, averageStock: 415.35, turnoverRate: 2.00 },
+    { id: "10000220", totalExits: 150.00, averageStock: 300.00, turnoverRate: 0.50 },
+    { id: "10000330", totalExits: 500.00, averageStock: 200.00, turnoverRate: 2.50 },
+];
 
-    // Handle file selection
-    const handleFileChange = (e, fileType) => {
-        const file = e.target.files[0];
-        if (file) {
-            if (fileType === "movement") setMovementFile(file);
-            else if (fileType === "stock") setStockFile(file);
-            setMessage(`${file.name} uploaded successfully.`);
-        }
+const Rotations = ({ data = INITIAL_DATA }) => {
+    const [tableData, setTableData] = useState(data);
+    const [filter, setFilter] = useState("");
+    const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
+    const [showHighTurnoverOnly, setShowHighTurnoverOnly] = useState(false);
+
+    const handleFilterChange = (e) => {
+        setFilter(e.target.value);
     };
 
-    // Placeholder for rotation calculation
-    const calculateRotations = () => {
-        if (!movementFile || !stockFile) {
-            setMessage("Please upload both movement and stock files.");
-            return;
+    const handleSort = (key) => {
+        let direction = "asc";
+        if (sortConfig.key === key && sortConfig.direction === "asc") {
+            direction = "desc";
         }
+        setSortConfig({ key, direction });
 
-        // Simulate reading and processing files (replace with actual logic)
-        const reader1 = new FileReader();
-        const reader2 = new FileReader();
-
-        reader1.onload = (e) => {
-            const movementData = new Uint8Array(e.target.result);
-            const workbook1 = XLSX.read(movementData, { type: "array" });
-            const sheet1 = workbook1.Sheets[workbook1.SheetNames[0]];
-            const movementJson = XLSX.utils.sheet_to_json(sheet1);
-
-            reader2.onload = (e) => {
-                const stockData = new Uint8Array(e.target.result);
-                const workbook2 = XLSX.read(stockData, { type: "array" });
-                const sheet2 = workbook2.Sheets[workbook2.SheetNames[0]];
-                const stockJson = XLSX.utils.sheet_to_json(sheet2);
-
-                // Placeholder rotation logic (customize based on your data structure)
-                const plantRotations = movementJson
-                    .filter((m) => m.Plant)
-                    .map((m) => ({
-                        id: m.ID || "N/A",
-                        plant: m.Plant,
-                        rotation: Math.random() * 100, // Replace with actual calculation
-                    }));
-                const slcRotations = movementJson
-                    .filter((m) => m.SLC)
-                    .map((m) => ({
-                        id: m.ID || "N/A",
-                        slc: m.SLC,
-                        rotation: Math.random() * 100, // Replace with actual calculation
-                    }));
-                const wj01Rotations = movementJson
-                    .filter((m) => m.WJ01)
-                    .map((m) => ({
-                        id: m.ID || "N/A",
-                        wj01: m.WJ01,
-                        rotation: Math.random() * 100, // Replace with actual calculation
-                    }));
-
-                setRotations({ plant: plantRotations, slc: slcRotations, wj01: wj01Rotations });
-                setMessage("Rotations calculated successfully.");
-            };
-            reader2.readAsArrayBuffer(stockFile);
-        };
-        reader1.readAsArrayBuffer(movementFile);
-    };
-
-    // Handle Excel export
-    const handleExportExcel = (type) => {
-        const data =
-            type === "plant"
-                ? rotations.plant
-                : type === "slc"
-                    ? rotations.slc
-                    : rotations.wj01;
-        if (data.length === 0) {
-            setMessage("No data to export.");
-            return;
-        }
-
-        const worksheet = XLSX.utils.json_to_sheet(data);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, `Rotation_${type}`);
-        const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
-        const blob = new Blob([excelBuffer], {
-            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8",
+        const sortedData = [...tableData].sort((a, b) => {
+            if (a[key] < b[key]) return direction === "asc" ? -1 : 1;
+            if (a[key] > b[key]) return direction === "asc" ? 1 : -1;
+            return 0;
         });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `rotation_${type}_export_${new Date().toISOString().split("T")[0]}.xlsx`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        setTableData(sortedData);
     };
 
-    // Handle print
-    const handlePrint = (type) => {
-        const printContent = tableRef.current;
-        if (!printContent) {
-            console.error("Table reference is null. Ensure the table is rendered.");
-            return;
-        }
-
-        const printWindow = window.open("", "", "height=600,width=800");
-        if (printWindow) {
-            printWindow.document.write("<html><head><title>Print</title>");
-            printWindow.document.write(
-                "<style>body { margin: 0; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #ddd; padding: 8px; text-align: left; } th { background-color: #f2f2f2; }</style>"
-            );
-            printWindow.document.write("</head><body>");
-            printWindow.document.write(printContent.outerHTML);
-            printWindow.document.write("</body></html>");
-            printWindow.document.close();
-            printWindow.focus();
-            printWindow.print();
-            printWindow.close();
-        } else {
-            console.error("Failed to open print window. Check browser popup settings.");
-        }
-    };
+    const filteredData = tableData.filter((item) =>
+        item.id.includes(filter) &&
+        (!showHighTurnoverOnly || item.turnoverRate > 1)
+    );
 
     return (
-        <TitleCard title="Calcul des Rotations">
-            <div className="p-6 bg-white rounded-lg shadow-lg">
-                {/* File Upload Section */}
-                <div className="mb-6">
-                    <h2 className="text-xl font-semibold mb-4">Sélection des Fichiers</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Fichier Mouvement
-                            </label>
-                            <input
-                                type="file"
-                                accept=".xlsx, .xls"
-                                onChange={(e) => handleFileChange(e, "movement")}
-                                className="w-full p-2 border border-gray-300 rounded-md"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Fichier État de Stock
-                            </label>
-                            <input
-                                type="file"
-                                accept=".xlsx, .xls"
-                                onChange={(e) => handleFileChange(e, "stock")}
-                                className="w-full p-2 border border-gray-300 rounded-md"
-                            />
-                        </div>
-                    </div>
-                    <button
-                        onClick={calculateRotations}
-                        className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                    >
-                        Calculer les Rotations
-                    </button>
+        <div className="container mx-auto p-6">
+            <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-2xl font-bold text-gray-800 mb-4">
+                    Rotation des Stocks par Article (2025)
+                </h2>
+                <div className="mb-4 flex flex-col sm:flex-row gap-4">
+                    <input
+                        type="text"
+                        placeholder="Filtrer par ID d'article..."
+                        value={filter}
+                        onChange={handleFilterChange}
+                        className="border border-gray-300 rounded-lg p-2 w-full sm:w-1/3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        aria-label="Filtrer les articles par ID"
+                    />
+                    <label className="flex items-center">
+                        <input
+                            type="checkbox"
+                            checked={showHighTurnoverOnly}
+                            onChange={() => setShowHighTurnoverOnly(!showHighTurnoverOnly)}
+                            className="mr-2"
+                            aria-label="Afficher uniquement les articles avec taux de rotation supérieur à 1"
+                        />
+                        Afficher uniquement les taux &gt; 1
+                    </label>
                 </div>
-
-                {message && <p className="mt-4 text-sm text-center text-red-600">{message}</p>}
-
-                {/* Display and Filter Results */}
-                <div className="mt-8">
-                    {["plant", "slc", "wj01"].map((type) => (
-                        <div key={type} className="mb-8">
-                            <h2 className="text-xl font-semibold mb-4">
-                                Rotation par {type === "plant" ? "Plant" : type === "slc" ? "SLC" : "WJ01"}
-                            </h2>
-                            <div className="mb-4 flex space-x-4">
-                                <button
-                                    onClick={() => handleExportExcel(type)}
-                                    className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                        <thead>
+                            <tr className="bg-blue-600 text-white">
+                                <th
+                                    className="p-3 text-left cursor-pointer"
+                                    onClick={() => handleSort("id")}
+                                    role="button"
+                                    aria-sort={sortConfig.key === "id" ? sortConfig.direction : "none"}
                                 >
-                                    Exporter en Excel
-                                </button>
-                                <button
-                                    onClick={() => handlePrint(type)}
-                                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                                    Article {sortConfig.key === "id" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+                                </th>
+                                <th
+                                    className="p-3 text-left cursor-pointer"
+                                    onClick={() => handleSort("totalExits")}
+                                    role="button"
+                                    aria-sort={sortConfig.key === "totalExits" ? sortConfig.direction : "none"}
                                 >
-                                    Imprimer
-                                </button>
-                            </div>
-                            {rotations[type].length > 0 ? (
-                                <div className="overflow-x-auto">
-                                    <table ref={tableRef} className="min-w-full bg-white border border-gray-300">
-                                        <thead>
-                                            <tr className="bg-gray-100">
-                                                <th className="py-2 px-4 border-b text-left text-sm font-medium text-gray-700">
-                                                    ID
-                                                </th>
-                                                <th className="py-2 px-4 border-b text-left text-sm font-medium text-gray-700">
-                                                    {type === "plant" ? "Plant" : type === "slc" ? "SLC" : "WJ01"}
-                                                </th>
-                                                <th className="py-2 px-4 border-b text-left text-sm font-medium text-gray-700">
-                                                    Rotation
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {rotations[type].map((item, index) => (
-                                                <tr key={index} className="hover:bg-gray-50">
-                                                    <td className="py-2 px-4 border-b text-sm text-gray-900">
-                                                        {item.id}
-                                                    </td>
-                                                    <td className="py-2 px-4 border-b text-sm text-gray-900">
-                                                        {item[type]}
-                                                    </td>
-                                                    <td className="py-2 px-4 border-b text-sm text-gray-900">
-                                                        {item.rotation.toFixed(2)}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            ) : (
-                                <p className="text-sm text-gray-600">Aucune rotation calculée.</p>
-                            )}
-                        </div>
-                    ))}
+                                    Total Sorties {sortConfig.key === "totalExits" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+                                </th>
+                                <th
+                                    className="p-3 text-left cursor-pointer"
+                                    onClick={() => handleSort("averageStock")}
+                                    role="button"
+                                    aria-sort={sortConfig.key === "averageStock" ? sortConfig.direction : "none"}
+                                >
+                                    Stock Moyen {sortConfig.key === "averageStock" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+                                </th>
+                                <th
+                                    className="p-3 text-left cursor-pointer"
+                                    onClick={() => handleSort("turnoverRate")}
+                                    role="button"
+                                    aria-sort={sortConfig.key === "turnoverRate" ? sortConfig.direction : "none"}
+                                >
+                                    Taux de Rotation {sortConfig.key === "turnoverRate" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredData.map((item) => (
+                                <tr
+                                    key={item.id}
+                                    className={`border-b ${item.turnoverRate > 1 ? "bg-red-100 text-red-700 font-semibold" : "even:bg-gray-50"}`}
+                                >
+                                    <td className="p-3">{item.id}</td>
+                                    <td className="p-3">{item.totalExits.toFixed(2)}</td>
+                                    <td className="p-3">{item.averageStock.toFixed(2)}</td>
+                                    <td className="p-3 flex items-center">
+                                        {item.turnoverRate.toFixed(2)}
+                                        {item.turnoverRate > 1 && (
+                                            <span className="ml-2 text-red-500" aria-label="Alerte : taux de rotation élevé">⚠️</span>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
+                <p className="mt-4 text-sm text-gray-600">
+                    <strong>Remarque :</strong> Les articles avec un taux de rotation &gt; 1 sont en surbrillance avec une alerte.
+                </p>
             </div>
-        </TitleCard>
+        </div>
     );
+};
+
+Rotations.propTypes = {
+    data: PropTypes.arrayOf(
+        PropTypes.shape({
+            id: PropTypes.string.isRequired,
+            totalExits: PropTypes.number.isRequired,
+            averageStock: PropTypes.number.isRequired,
+            turnoverRate: PropTypes.number.isRequired,
+        })
+    ),
 };
 
 export default Rotations;

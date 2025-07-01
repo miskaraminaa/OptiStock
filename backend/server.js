@@ -1,10 +1,11 @@
 const express = require('express');
-const cors = require('cors');
+const cors = require('cors'); 
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const dimensionsRouter = require('./routes/dimensions');
 const explorationRouter = require('./routes/exploration');
+const chartsRouter = require('./routes/charts');
 
 let livraisonRouter;
 let uploadRouter;
@@ -46,6 +47,10 @@ if (uploadRouter) {
 app.use('/livraison', livraisonRouter);
 app.use('/dimensions', dimensionsRouter);
 app.use('/explorer', explorationRouter);
+
+app.use('/charts', chartsRouter);
+
+
 // Route de test DB
 app.get('/test-db', async (req, res) => {
     const pool = require('./config/db');

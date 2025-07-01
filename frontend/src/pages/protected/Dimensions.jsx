@@ -27,7 +27,7 @@ const Dimensions = () => {
                 });
                 if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                 const result = await res.json();
-                const sortedIds = result.ids?.sort((a, b) => a.localeCompare(b)) || [];
+                const sortedIds = result.ids?.map(String).sort((a, b) => a.localeCompare(b)) || [];
                 setIds(sortedIds);
             } catch (err) {
                 console.error("Error fetching IDs:", err);
@@ -77,7 +77,15 @@ const Dimensions = () => {
         }
 
         try {
-            const body = { id_article: selectedId, longueur: longueurNum, largeur: largeurNum, hauteur: hauteurNum, poids: poidsNum, qte: qteNum };
+            const toNum = x => Number(x);
+            const body = {
+                id_article: selectedId,
+                longueur: toNum(longueur),
+                largeur: toNum(largeur),
+                hauteur: toNum(hauteur),
+                poids: toNum(poids),
+                qte: toNum(qte)
+            };
             const res = await fetch(`${BASE_URL}/dimensions/`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -86,7 +94,7 @@ const Dimensions = () => {
             const result = await res.json();
             if (res.ok) {
                 setMessage("Dimensions enregistrées avec succès.");
-                setData(result.data[0]);
+                setData(result.data[0]); // Fixed: Correctly set the data state
                 const dimensionsRes = await fetch(`${BASE_URL}/dimensions/`);
                 const dimensionsResult = await dimensionsRes.json();
                 setDimensions(dimensionsResult.data || []);
@@ -125,7 +133,7 @@ const Dimensions = () => {
     const handlePrint = () => {
         const printContent = tableRef.current;
         if (!printContent) {
-            console.error("Table reference is null. Ensure the table is rendered.");
+            console.error("Table reference is null. Ensure the table is rendered before printing.");
             return;
         }
 
