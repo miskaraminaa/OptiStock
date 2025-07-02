@@ -9,7 +9,15 @@ const chartsRouter = require('./routes/charts');
 
 let livraisonRouter;
 let uploadRouter;
+let rotaRouter;
 
+try {
+    rotaRouter = require('./routes/rotation');
+    console.log('Routeur rotation chargé avec succès');
+} catch (err) {
+    console.error('Échec du chargement du routeur rotation :', err.message, err.stack);
+    process.exit(1); // Arrête le serveur si le routeur échoue
+}
 try {
     livraisonRouter = require('./routes/livraison');
     console.log('Routeur livraison chargé avec succès');
@@ -49,6 +57,7 @@ app.use('/dimensions', dimensionsRouter);
 app.use('/explorer', explorationRouter);
 
 app.use('/charts', chartsRouter);
+app.use('/rotation', rotaRouter);
 
 
 // Route de test DB
