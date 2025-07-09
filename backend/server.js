@@ -6,6 +6,9 @@ const authRoutes = require('./routes/auth');
 const dimensionsRouter = require('./routes/dimensions');
 const explorationRouter = require('./routes/exploration');
 const chartsRouter = require('./routes/charts');
+const controleRouter = require('./routes/controle');
+const rangementRouter = require('./routes/rangement');
+
 
 let livraisonRouter;
 let uploadRouter;
@@ -58,7 +61,8 @@ app.use('/explorer', explorationRouter);
 
 app.use('/charts', chartsRouter);
 app.use('/rotation', rotaRouter);
-
+app.use('/controle', controleRouter);
+app.use('/rangement', rangementRouter);
 
 // Route de test DB
 app.get('/test-db', async (req, res) => {

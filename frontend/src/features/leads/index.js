@@ -27,7 +27,6 @@ const Livraison = () => {
 
     const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
-    // Définitions des colonnes
     const LE_COLUMNS = [
         { header: "N° LE", key: "Document" },
         { header: "Statut Tâche Magasin", key: "Statut_tache_magasin" },
@@ -39,8 +38,8 @@ const Livraison = () => {
         { header: "Volume", key: "volume" },
         { header: "Poids", key: "poids" },
         { header: "Quantité", key: "Quantite" },
-        { header: "Poids Global", key: "poids_global" }, // Adjusted to match backend alias
-        { header: "Volume/Quantité", key: "volume_quantite" }, // Adjusted to match backend alias
+        { header: "Poids Global", key: "poids_global" },
+        { header: "Volume/Quantité", key: "volume_quantite" },
         { header: "Manutention", key: "manutention" },
         { header: "Type Rayon", key: "Type_Rayon" },
         { header: "Emplacement Cédant", key: "emplacement_cedant" },
@@ -65,7 +64,6 @@ const Livraison = () => {
         { header: "Statut Activité Magasin", key: "statut_entree_stock" },
     ];
 
-    // Récupérer les noms de fichiers disponibles
     useEffect(() => {
         const fetchFiles = async () => {
             setIsLoadingFiles(true);
@@ -99,7 +97,6 @@ const Livraison = () => {
         if (selectedType) fetchFiles();
     }, [BASE_URL, selectedType]);
 
-    // Récupérer et filtrer les données
     useEffect(() => {
         const fetchData = async () => {
             setIsLoadingData(true);
@@ -123,8 +120,16 @@ const Livraison = () => {
                     throw new Error(`Erreur HTTP ! statut : ${res.status}, message : ${errorText}`);
                 }
                 const data = await res.json();
-                setData(data);
-                applyFilters(data); // Apply filters immediately after fetching
+                console.log("Données brutes reçues du backend :", data);
+                // Normaliser les valeurs de statut_entree_stock
+                const normalizedData = data.map(item => ({
+                    ...item,
+                    statut_entree_stock: item.statut_entree_stock
+                        ? item.statut_entree_stock.trim().toLowerCase()
+                        : "non terminée",
+                }));
+                setData(normalizedData);
+                applyFilters(normalizedData);
             } catch (err) {
                 console.error("Erreur lors de la récupération des données :", err);
                 setError(`Échec du chargement des données : ${err.message}`);
@@ -140,11 +145,24 @@ const Livraison = () => {
                     item.Produit?.toString().toLowerCase().includes(filters.articleCode.toLowerCase())
                 );
             }
-            if (filters.status && filters.status !== "Tous les statuts") {
+            if (filters.deliveryCode) {
                 filtered = filtered.filter((item) =>
-                    item.statut_entree_stock?.toLowerCase() === filters.status.toLowerCase()
+                    item.Document?.toString().toLowerCase().includes(filters.deliveryCode.toLowerCase())
                 );
             }
+            if (filters.status && filters.status !== "Tous les statuts") {
+                const filterStatus = filters.status.toLowerCase();
+                filtered = filtered.filter((item) => {
+                    const status = item.statut_entree_stock?.toLowerCase() || "";
+                    console.log(`Comparaison statut : item=${status}, filtre=${filterStatus}`);
+                    // Pour "Non terminée", inclure tout sauf "Terminée"
+                    if (filterStatus === "non terminée") {
+                        return status !== "terminée";
+                    }
+                    return status === filterStatus;
+                });
+            }
+            console.log("Données après filtrage :", filtered);
             setFilteredData(filtered);
         };
 
@@ -159,7 +177,6 @@ const Livraison = () => {
         }
     }, [selectedFile, filters, BASE_URL, selectedType]);
 
-    // Basculer la sélection d'un élément
     const toggleItem = (index) => {
         const newSelected = new Set(selectedItems);
         if (newSelected.has(index)) {
@@ -170,7 +187,6 @@ const Livraison = () => {
         setSelectedItems(newSelected);
     };
 
-    // Ajouter ou supprimer des éléments
     const updateItems = (action) => {
         if (action === "add" && newItem) {
             const itemToAdd = {
@@ -186,8 +202,8 @@ const Livraison = () => {
                 itemToAdd.volume = newItem.volume || "100000";
                 itemToAdd.poids = newItem.poids || "10";
                 itemToAdd.Quantite = newItem.Quantite || "100";
-                itemToAdd["Poids global"] = newItem.poids_global || "1000"; // Match backend alias
-                itemToAdd["Volume quantite"] = newItem.volume_quantite || "1000"; // Match backend alias
+                itemToAdd.poids_global = newItem.poids_global || "1000";
+                itemToAdd.volume_quantite = newItem.volume_quantite || "1000";
                 itemToAdd.manutention = newItem.manutention || "Manuel";
                 itemToAdd.Type_Rayon = newItem.Type_Rayon || "Standard";
             }
@@ -207,7 +223,6 @@ const Livraison = () => {
         }
     };
 
-    // Gérer la suppression
     const handleDelete = (index) => {
         const newData = [...filteredData];
         newData.splice(index, 1);
@@ -215,7 +230,6 @@ const Livraison = () => {
         setSelectedItems(new Set());
     };
 
-    // Exporter vers Excel
     const exportToExcel = () => {
         const ws = XLSX.utils.json_to_sheet(filteredData);
         const wb = XLSX.utils.book_new();
@@ -223,7 +237,6 @@ const Livraison = () => {
         XLSX.writeFile(wb, `livraison_${moment().format("YYYYMMDD_HHmmss")}.xlsx`);
     };
 
-    // Imprimer les données
     const handlePrint = () => {
         const printContent = document.getElementById("livraison-table").outerHTML;
         const printWindow = window.open('', '_blank');
@@ -238,6 +251,13 @@ const Livraison = () => {
     };
 
     const columns = selectedType === 'LE' ? LE_COLUMNS : LS_COLUMNS;
+
+    // Liste des statuts pour le menu déroulant
+    const STATUS_OPTIONS = [
+        { value: "Tous les statuts", label: "Tous les statuts" },
+        { value: "Terminée", label: "Terminée" },
+        { value: "Non terminée", label: "Non terminée" },
+    ];
 
     return (
         <TitleCard title="Livraison">
@@ -281,10 +301,19 @@ const Livraison = () => {
                         onChange={(e) => setFilters({ ...filters, status: e.target.value })}
                         className="p-2 border rounded"
                     >
-                        <option value="Tous les statuts">Tous les statuts</option>
-                        <option value="Terminée">Terminée</option>
-                        <option value="Non terminée">Non terminée</option>
+                        {STATUS_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                                {option.label}
+                            </option>
+                        ))}
                     </select>
+                    <input
+                        type="text"
+                        placeholder="N° Livraison (LE/LS)"
+                        value={filters.deliveryCode}
+                        onChange={(e) => setFilters({ ...filters, deliveryCode: e.target.value })}
+                        className="p-2 border rounded"
+                    />
                     <input
                         type="text"
                         placeholder="Code article"
@@ -363,8 +392,6 @@ const Livraison = () => {
                                 onChange={(e) => setNewItem({ ...newItem, designation_article: e.target.value })}
                                 className="p-2 border rounded"
                             />
-                           
-                            
                             {selectedType === 'LE' && (
                                 <>
                                     <input
@@ -412,15 +439,15 @@ const Livraison = () => {
                                     <input
                                         type="number"
                                         placeholder="Poids Global"
-                                        value={newItem["Poids global"] || ""}
-                                        onChange={(e) => setNewItem({ ...newItem, "Poids global": e.target.value })}
+                                        value={newItem.poids_global || ""}
+                                        onChange={(e) => setNewItem({ ...newItem, poids_global: e.target.value })}
                                         className="p-2 border rounded"
                                     />
                                     <input
                                         type="number"
                                         placeholder="Volume/Quantité"
-                                        value={newItem["Volume quantite"] || ""}
-                                        onChange={(e) => setNewItem({ ...newItem, "Volume quantite": e.target.value })}
+                                        value={newItem.volume_quantite || ""}
+                                        onChange={(e) => setNewItem({ ...newItem, volume_quantite: e.target.value })}
                                         className="p-2 border rounded"
                                     />
                                     <input
@@ -439,7 +466,6 @@ const Livraison = () => {
                                     />
                                 </>
                             )}
-                        
                             <input
                                 type="text"
                                 placeholder={selectedType === 'LE' ? "Emplacement Cédant" : "Emplacement Cédant"}
@@ -491,6 +517,9 @@ const Livraison = () => {
                             >
                                 <option value="Non terminée">Non terminée</option>
                                 <option value="Terminée">Terminée</option>
+                                <option value="Partiellement terminée">Partiellement terminée</option>
+                                <option value="Pas commencée">Pas commencée</option>
+                                <option value="Pas pertinente">Pas pertinente</option>
                             </select>
                             <select
                                 value={newItem.statut_entree_stock || "Non terminée"}
@@ -499,6 +528,9 @@ const Livraison = () => {
                             >
                                 <option value="Non terminée">Non terminée</option>
                                 <option value="Terminée">Terminée</option>
+                                <option value="Partiellement terminée">Partiellement terminée</option>
+                                <option value="Pas commencée">Pas commencée</option>
+                                <option value="Pas pertinente">Pas pertinente</option>
                             </select>
                             <button
                                 type="submit"
@@ -536,35 +568,43 @@ const Livraison = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredData.map((row, index) => (
-                                <tr
-                                    key={index}
-                                    className={`${selectedItems.has(index) ? "bg-gray-100" : ""} border-b hover:bg-gray-50`}
-                                >
-                                    <td className="px-4 py-2">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedItems.has(index)}
-                                            onChange={() => toggleItem(index)}
-                                            disabled={isLoadingData}
-                                        />
-                                    </td>
-                                    {columns.map((col) => (
-                                        <td key={col.key} className="px-4 py-2" style={col.style || {}}>
-                                            {row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : ""}
-                                        </td>
-                                    ))}
-                                    <td className="px-4 py-2">
-                                        <button
-                                            onClick={() => handleDelete(index)}
-                                            className="text-red-500 hover:text-red-700"
-                                            disabled={isLoadingData}
-                                        >
-                                            <TrashIcon className="h-5 w-5" />
-                                        </button>
+                            {filteredData.length === 0 ? (
+                                <tr>
+                                    <td colSpan={columns.length + 2} className="px-4 py-2 text-center text-gray-500">
+                                        Aucune donnée disponible pour les filtres sélectionnés.
                                     </td>
                                 </tr>
-                            ))}
+                            ) : (
+                                filteredData.map((row, index) => (
+                                    <tr
+                                        key={index}
+                                        className={`${selectedItems.has(index) ? "bg-gray-100" : ""} border-b hover:bg-gray-50`}
+                                    >
+                                        <td className="px-4 py-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedItems.has(index)}
+                                                onChange={() => toggleItem(index)}
+                                                disabled={isLoadingData}
+                                            />
+                                        </td>
+                                        {columns.map((col) => (
+                                            <td key={col.key} className="px-4 py-2" style={col.style || {}}>
+                                                {row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : ""}
+                                            </td>
+                                        ))}
+                                        <td className="px-4 py-2">
+                                            <button
+                                                onClick={() => handleDelete(index)}
+                                                className="text-red-500 hover:text-red-700"
+                                                disabled={isLoadingData}
+                                            >
+                                                <TrashIcon className="h-5 w-5" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>

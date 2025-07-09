@@ -9,6 +9,8 @@ import KeyIcon from '@heroicons/react/24/outline/KeyIcon';
 import CubeIcon from '@heroicons/react/24/outline/CubeIcon';
 import ArrowPathIcon from '@heroicons/react/24/outline/ArrowPathIcon';
 import ClipboardDocumentListIcon from '@heroicons/react/24/outline/ClipboardDocumentListIcon';
+import CheckCircleIcon from '@heroicons/react/24/outline/CheckCircleIcon';
+import ArchiveBoxIcon from '@heroicons/react/24/outline/ArchiveBoxIcon'; // Nouvelle icône importée
 
 // Lazy-loaded components
 const Dashboard = lazy(() => import('../pages/protected/Dashboard'));
@@ -18,7 +20,8 @@ const Leads = lazy(() => import('../pages/protected/Leads'));
 const Dimensions = lazy(() => import('../pages/protected/Dimensions'));
 const Rotations = lazy(() => import('../pages/protected/Rotations'));
 const Explorer = lazy(() => import('../pages/protected/Explorer'));
-
+const Controle = lazy(() => import('../pages/protected/Controle'));
+const Rangement = lazy(() => import('../pages/protected/Rangement'));
 const ForgotPassword = lazy(() => import('../pages/ForgotPassword'));
 
 const iconClasses = `h-6 w-6`;
@@ -45,10 +48,10 @@ const routes = [
         name: 'Livraison',
     },
     {
-        path: '/app/charts',
-        component: Charts,
-        icon: <ChartBarIcon className={iconClasses} />,
-        name: 'Analytique',
+        path: '/app/controle',
+        component: Controle,
+        icon: <CheckCircleIcon className={iconClasses} />,
+        name: 'Controle Livraison',
     },
     {
         path: '/app/dimensions',
@@ -67,6 +70,18 @@ const routes = [
         component: Explorer,
         icon: <ClipboardDocumentListIcon className={iconClasses} />,
         name: 'Explorer Articles',
+    },
+    {
+        path: '/app/rangement',
+        component: Rangement,
+        icon: <ArchiveBoxIcon className={iconClasses} />, // Remplacement par ArchiveBoxIcon
+        name: 'Guide au rangement',
+    },
+    {
+        path: '/app/charts',
+        component: Charts,
+        icon: <ChartBarIcon className={iconClasses} />,
+        name: 'Analytique',
     },
     {
         path: '',

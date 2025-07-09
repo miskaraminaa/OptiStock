@@ -7,11 +7,22 @@ const Welcome = lazy(() => import('../pages/protected/Welcome'));
 const Charts = lazy(() => import('../pages/protected/Charts'));
 const Leads = lazy(() => import('../pages/protected/Leads'));
 const Dimensions = lazy(() => import('../pages/protected/Dimensions'));
+const Controle = lazy(() => import('../pages/protected/Controle'));
+const Rangement = lazy(() => import('../pages/protected/Rangement'));
+
 
 const routes = [
   {
     path: '/dashboard', 
     component: Dashboard, // view rendered
+  },
+  {
+    path: '/controle',
+    component: Controle, // view rendered
+  },
+  {
+    path: '/rangement',
+    component: Rangement, // view rendered
   },
   {
     path: '/welcome', // the url

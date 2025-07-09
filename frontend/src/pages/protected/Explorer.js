@@ -185,8 +185,7 @@ const Explorer = () => {
                                                 'Prix',
                                                 'Valeur Stock',
                                                 'Devise',
-                                                'Statut Tâche Magasin',
-                                                'Statut Activité Magasin'
+                                                
                                             ].map((header) => (
                                                 <th key={header} className="px-4 py-3 text-left text-sm font-semibold tracking-wide">
                                                     {header}
@@ -215,8 +214,7 @@ const Explorer = () => {
                                                 <td className="px-4 py-3 text-sm text-gray-600">{article.prix || 'N/A'}</td>
                                                 <td className="px-4 py-3 text-sm text-gray-600">{article.valeur_stock || 'N/A'}</td>
                                                 <td className="px-4 py-3 text-sm text-gray-600">{article.devise || 'N/A'}</td>
-                                                <td className="px-4 py-3 text-sm text-gray-600">{article.Statut_tache_magasin || 'N/A'}</td>
-                                                <td className="px-4 py-3 text-sm text-gray-600">{article.Statut_activite_magasin || 'N/A'}</td>
+                                               
                                             </tr>
                                         ))}
                                     </tbody>
@@ -245,9 +243,7 @@ const Explorer = () => {
                                         <div><span className="font-semibold text-gray-700">Prix :</span><p className="text-gray-900">{article.prix || 'N/A'}</p></div>
                                         <div><span className="font-semibold text-gray-700">Valeur Stock :</span><p className="text-gray-900">{article.valeur_stock || 'N/A'}</p></div>
                                         <div><span className="font-semibold text-gray-700">Devise :</span><p className="text-gray-900">{article.devise || 'N/A'}</p></div>
-                                        <div><span className="font-semibold text-gray-700">Statut Tâche Magasin :</span><p className="text-gray-900">{article.Statut_tache_magasin || 'N/A'}</p></div>
-                                        <div><span className="font-semibold text-gray-700">Statut Activité Magasin :</span><p className="text-gray-900">{article.Statut_activite_magasin || 'N/A'}</p></div>
-                                    </div>
+                                        </div>
                                 </div>
                             ))}
                         </div>

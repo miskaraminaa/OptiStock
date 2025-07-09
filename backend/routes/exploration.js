@@ -24,7 +24,10 @@ const authenticateToken = (req, res, next) => {
 
 router.get('/', authenticateToken, async (req, res) => {
     try {
-        // Fixed query with correct column names
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50;
+        const offset = (page - 1) * limit;
+
         const query = `
             SELECT 
                 s.article,
@@ -45,46 +48,42 @@ router.get('/', authenticateToken, async (req, res) => {
                 s.date_em,
                 s.derniere_sortie,
                 s.uploaded_at,
-                s.name_file,
-                COALESCE(lt.Statut_tache_magasin, 'Not Available') AS Statut_tache_magasin,
-                COALESCE(ls.statut_activite_magasin, 'Not Available') AS Statut_activite_magasin,
-                lt.Produit AS debug_produit,
-                lt.Document AS debug_document
+                s.name_file
+                
             FROM stock_ewm s
             LEFT JOIN le_tache lt ON s.article = lt.Produit
             LEFT JOIN le_status ls ON lt.Document = ls.Document
-            WHERE s.article IS NOT NULL;
+            WHERE s.article IS NOT NULL
+            LIMIT ? OFFSET ?;
         `;
 
-        console.log(`[${new Date().toISOString()}] Executing corrected query...`);
-        const [rows] = await pool.query(query);
+        console.log(`[${new Date().toISOString()}] Executing query with limit ${limit}, offset ${offset}`);
+        const start = Date.now();
+        const [rows] = await pool.query(query, [limit, offset]);
+        console.log(`[${new Date().toISOString()}] Query took ${Date.now() - start}ms, Rows returned: ${rows.length}`);
 
-        console.log(`[${new Date().toISOString()}] Query executed successfully`);
-        console.log(`[${new Date().toISOString()}] Rows returned: ${rows.length}`);
-
-        if (rows && rows.length > 0) {
-            console.log(`[${new Date().toISOString()}] Available columns:`, Object.keys(rows[0]));
-            console.log(`[${new Date().toISOString()}] First row sample:`, JSON.stringify(rows[0], null, 2));
-        }
-
-        if (!rows || rows.length === 0) {
-            console.log(`[${new Date().toISOString()}] No articles found`);
+        if (rows.length === 0) {
             return res.status(200).json({
                 data: [],
-                message: 'No articles found'
+                message: 'No articles found',
+                page,
+                limit
             });
         }
 
         res.status(200).json({
             data: rows,
-            message: 'Articles fetched successfully'
+            message: 'Articles fetched successfully',
+            page,
+            limit
         });
     } catch (err) {
         console.error(`[${new Date().toISOString()}] Database error:`, err.message, err.stack);
-        res.status(500).json({
-            message: 'Failed to fetch articles',
-            error: err.message
-        });
+        if (err.code === 'ETIMEDOUT') {
+            res.status(504).json({ message: 'Database query timed out', error: err.message });
+        } else {
+            res.status(500).json({ message: 'Failed to fetch articles', error: err.message });
+        }
     }
 });
 
@@ -99,15 +98,12 @@ router.get('/test-columns', authenticateToken, async (req, res) => {
                 s.type_stock,
                 s.designation_type_stock,
                 s.valeur_stock,
-                lt.Statut_tache_magasin,
-                ls.statut_activite_magasin,
                 lt.Produit,
                 lt.Document
             FROM stock_ewm s
             LEFT JOIN le_tache lt ON s.article = lt.Produit
             LEFT JOIN le_status ls ON lt.Document = ls.Document
-            WHERE s.article IS NOT NULL
-            LIMIT 5;
+            WHERE s.article IS NOT NULL;
         `;
 
         const [rows] = await pool.query(testQuery);

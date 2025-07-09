@@ -801,12 +801,6 @@ router.post('/', authenticate, upload.single('file'), async (req, res) => {
                 console.log('No sheets found in Excel file');
                 return res.status(400).json({ message: 'Excel file has no sheets' });
             }
-            data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { raw: false, dateNF: 'yyyy-mm-dd', header: 1 });
-            // Extract headers from the first row
-            const headers = data[0] || [];
-            console.log('Excel headers (raw):', headers);
-            console.log('Excel headers (normalized):', headers.map(normalizeHeader));
-            // Convert headers to JSON objects, skipping the header row
             data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { raw: false, dateNF: 'yyyy-mm-dd' });
             if (data.length === 0) {
                 console.log('Excel file is empty');
@@ -860,6 +854,26 @@ router.post('/', authenticate, upload.single('file'), async (req, res) => {
                     continue;
                 }
 
+                // Cleaning for le_tache: Skip rows with NULL or empty Produit
+                if (tableName === 'le_tache') {
+                    const produitValue = mappedData.Produit;
+                    const trimmedProduit = typeof produitValue === 'string' ? produitValue.trim() : produitValue;
+                    if (!trimmedProduit || trimmedProduit === '' || trimmedProduit === null || trimmedProduit === undefined) {
+                        console.log(`Row ${i + 2}: Skipped due to invalid Produit value:`, {
+                            rawValue: produitValue,
+                            trimmedValue: trimmedProduit,
+                            rawData: rowData
+                        });
+                        failureData.push({
+                            rowIndex: i + 2,
+                            error: 'Invalid Produit value (NULL, empty, or whitespace)',
+                            unmatchedHeaders,
+                            rawData: rowData
+                        });
+                        continue;
+                    }
+                    mappedData.Produit = trimmedProduit; // Ensure trimmed value is used
+                }
                 if (validMetadataColumns.includes('name_file') && !mappedData.name_file) {
                     mappedData.name_file = fileName;
                     console.log(`Row ${i + 2}: Added name_file metadata: ${fileName}`);
