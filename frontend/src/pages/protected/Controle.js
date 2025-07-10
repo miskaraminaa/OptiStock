@@ -7,7 +7,6 @@ import * as XLSX from "xlsx";
 
 const Controle = () => {
     const dispatch = useDispatch();
-
     const [data, setData] = useState([]);
     const [filteredData, setFilteredData] = useState([]);
     const [filters, setFilters] = useState({
@@ -19,17 +18,23 @@ const Controle = () => {
     const [isLoadingData, setIsLoadingData] = useState(false);
     const [error, setError] = useState(null);
     const [showAddForm, setShowAddForm] = useState(false);
-    const [newItem, setNewItem] = useState({});
+    const [newItem, setNewItem] = useState({
+        type_sortie: "OT",
+        nature_sortie: "normal",
+        magasin: "Magasin"
+    });
 
     const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
     const COLUMNS = [
         { header: "N° OT", key: "n_ot" },
         { header: "BS", key: "bs" },
+        { header: "LE", key: "le" },
         { header: "Commande d'achat", key: "commande_achat" },
         { header: "Nature de sortie", key: "nature_sortie" },
         { header: "Type de sortie", key: "type_sortie" },
         { header: "N° Réservation", key: "n_reservation" },
+        { header: "Magasin", key: "magasin" },
         { header: "Local", key: "local" },
         { header: "Demandeur", key: "demandeur" },
         { header: "Préparateur", key: "preparateur" },
@@ -37,12 +42,44 @@ const Controle = () => {
     ];
 
     const TYPE_SORTIE_OPTIONS = [
-        { value: "", label: "Tous les types" },
-        { value: "BS", label: "BS" },
         { value: "OT", label: "OT" },
-        { value: "cmd", label: "Commande" },
-        { value: "MDR", label: "MDR" },
+        { value: "BS", label: "BS" },
+        { value: "LE", label: "LE" },
+        { value: "CMD", label: "Commande" },
     ];
+
+    const NATURE_SORTIE_OPTIONS = [
+        { value: "urgent", label: "Urgent" },
+        { value: "normal", label: "Normal" },
+        { value: "session", label: "Session" },
+    ];
+
+    const MAGASIN_OPTIONS = [
+        { value: "Magasin", label: "Magasin" },
+        { value: "Magasin EPI", label: "Magasin EPI" },
+    ];
+
+    const LOCAL_OPTIONS = {
+        "Magasin": [
+            { value: "MSLE", label: "MSLE - BOUZIT LAHSSAN", responsable: "BOUZIT LAHSSAN" },
+            { value: "MSLT", label: "MSLT - BOUZIT LAHSSAN", responsable: "BOUZIT LAHSSAN" },
+            { value: "MSLV", label: "MSLV - BENDADA MOHAMMED", responsable: "BENDADA MOHAMMED" },
+            { value: "MSRL", label: "MSRL - BENDADA MOHAMMED", responsable: "BENDADA MOHAMMED" },
+            { value: "MSGP", label: "MSGP - BENDADA MOHAMMED", responsable: "BENDADA MOHAMMED" },
+            { value: "MSLL", label: "MSLL - BENDADA MOHAMMED", responsable: "BENDADA MOHAMMED" },
+            { value: "MSPC", label: "MSPC - BENDADA MOHAMMED", responsable: "BENDADA MOHAMMED" },
+            { value: "DSED", label: "DSED - BENDADA MOHAMMED", responsable: "BENDADA MOHAMMED" },
+        ],
+        "Magasin EPI": [
+            { value: "MSFE", label: "MSFE - BOUALLAK NOURDINE", responsable: "BOUALLAK NOURDINE" },
+            { value: "P-ext", label: "P-ext - SARGALI YOUSSEF", responsable: "SARGALI YOUSSEF" },
+        ],
+    };
+
+    const RESPONSABLE_MAGASIN = {
+        "Magasin": "JAMAL RHENNAOUI",
+        "Magasin EPI": "ELBAHI AMINE",
+    };
 
     const fetchData = async () => {
         setIsLoadingData(true);
@@ -53,27 +90,24 @@ const Controle = () => {
             bs: filters.bs || "",
             typeSortie: filters.typeSortie || "",
         };
-        console.log(`Récupération des données depuis : ${url} avec les données :`, payload);
         try {
             const res = await fetch(url, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
             });
-            if (!res.ok) {
-                const errorText = await res.text();
-                throw new Error(`Erreur HTTP ! statut : ${res.status}, message : ${errorText}`);
-            }
+            if (!res.ok) throw new Error(`Erreur HTTP ! statut : ${res.status}`);
             const data = await res.json();
-            console.log("Données brutes reçues du backend :", data);
             const normalizedData = data.map(item => ({
                 ...item,
                 n_ot: item.n_ot ? item.n_ot.trim().toLowerCase() : "",
                 bs: item.bs ? item.bs.trim().toLowerCase() : "",
-                type_sortie: item.type_sortie ? item.type_sortie.trim().toLowerCase() : "",
+                le: item.le ? item.le.trim().toLowerCase() : "",
                 commande_achat: item.commande_achat ? item.commande_achat.trim() : "",
                 nature_sortie: item.nature_sortie ? item.nature_sortie.trim() : "",
+                type_sortie: item.type_sortie ? item.type_sortie.trim().toLowerCase() : "",
                 n_reservation: item.n_reservation ? item.n_reservation.trim() : "",
+                magasin: item.magasin ? item.magasin.trim() : "",
                 local: item.local ? item.local.trim() : "",
                 demandeur: item.demandeur ? item.demandeur.trim() : "",
                 preparateur: item.preparateur ? item.preparateur.trim() : "",
@@ -82,7 +116,6 @@ const Controle = () => {
             setData(normalizedData);
             applyFilters(normalizedData);
         } catch (err) {
-            console.error("Erreur lors de la récupération des données :", err);
             setError(`Échec du chargement des données : ${err.message}`);
         } finally {
             setIsLoadingData(false);
@@ -106,13 +139,12 @@ const Controle = () => {
                 item.type_sortie?.toLowerCase() === filters.typeSortie.toLowerCase()
             );
         }
-        console.log("Données après filtrage :", filtered);
         setFilteredData(filtered);
     };
 
     useEffect(() => {
         fetchData();
-    }, [filters, BASE_URL]);
+    }, [filters]);
 
     const toggleItem = (index) => {
         const newSelected = new Set(selectedItems);
@@ -127,35 +159,25 @@ const Controle = () => {
     const updateItems = async (action) => {
         try {
             if (action === "add" && newItem) {
-                if (!newItem.n_ot.match(/^OT\d+$/)) {
-                    setError("N° OT doit commencer par 'OT' suivi de chiffres.");
-                    return;
-                }
+                const selectedLocal = LOCAL_OPTIONS[newItem.magasin]?.find(loc => loc.value === newItem.local);
                 const itemToAdd = {
                     ...newItem,
-                    n_ot: newItem.n_ot || `OT${moment().format("YYYYMMDDHHmmss")}`,
-                    bs: newItem.bs || "",
-                    commande_achat: newItem.commande_achat || "",
-                    nature_sortie: newItem.nature_sortie || "",
-                    type_sortie: newItem.type_sortie || "BS",
-                    n_reservation: newItem.n_reservation || "",
-                    local: newItem.local || "",
-                    demandeur: newItem.demandeur || "",
-                    preparateur: newItem.preparateur || "",
-                    responsable_local: newItem.responsable_local || "",
+                    n_ot: newItem.type_sortie === "OT" ? newItem.n_ot || `OT${moment().format("YYYYMMDDHHmmss")}` : "",
+                    bs: newItem.type_sortie === "BS" ? newItem.bs || `BS${moment().format("YYYYMMDDHHmmss")}` : "",
+                    le: newItem.type_sortie === "LE" ? newItem.le || `LE${moment().format("YYYYMMDDHHmmss")}` : "",
+                    commande_achat: newItem.type_sortie === "CMD" ? newItem.commande_achat || `CMD${moment().format("YYYYMMDDHHmmss")}` : "",
+                    responsable_local: selectedLocal?.responsable || newItem.responsable_local || "",
+                    magasin: newItem.magasin || "Magasin",
                 };
                 const res = await fetch(`${BASE_URL}/controle/update`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ action: "add", data: itemToAdd }),
                 });
-                if (!res.ok) {
-                    const errorText = await res.json();
-                    throw new Error(errorText.error || "Erreur lors de l'ajout");
-                }
+                if (!res.ok) throw new Error((await res.json()).error || "Erreur lors de l'ajout");
                 setShowAddForm(false);
-                setNewItem({});
-                await fetchData(); // Refresh data
+                setNewItem({ type_sortie: "OT", nature_sortie: "normal", magasin: "Magasin" });
+                await fetchData();
             } else if (action === "remove" && selectedItems.size > 0) {
                 const nOtsToRemove = Array.from(selectedItems).map(index => filteredData[index].n_ot);
                 const res = await fetch(`${BASE_URL}/controle/update`, {
@@ -163,15 +185,11 @@ const Controle = () => {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ action: "remove", data: nOtsToRemove }),
                 });
-                if (!res.ok) {
-                    const errorText = await res.json();
-                    throw new Error(errorText.error || "Erreur lors de la suppression");
-                }
+                if (!res.ok) throw new Error((await res.json()).error || "Erreur lors de la suppression");
                 setSelectedItems(new Set());
-                await fetchData(); // Refresh data
+                await fetchData();
             }
         } catch (err) {
-            console.error("Erreur lors de la mise à jour :", err);
             setError(`Échec de la mise à jour : ${err.message}`);
         }
     };
@@ -184,14 +202,10 @@ const Controle = () => {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ action: "remove", data: [nOtToRemove] }),
             });
-            if (!res.ok) {
-                const errorText = await res.json();
-                throw new Error(errorText.error || "Erreur lors de la suppression");
-            }
+            if (!res.ok) throw new Error((await res.json()).error || "Erreur lors de la suppression");
             setSelectedItems(new Set());
-            await fetchData(); // Refresh data
+            await fetchData();
         } catch (err) {
-            console.error("Erreur lors de la suppression :", err);
             setError(`Échec de la suppression : ${err.message}`);
         }
     };
@@ -210,45 +224,14 @@ const Controle = () => {
                 <head>
                     <title>Contrôle Livraison - ${moment().format("DD/MM/YYYY HH:mm")}</title>
                     <style>
-                        body {
-                            font-family: Arial, sans-serif;
-                            margin: 20px;
-                            color: #000;
-                        }
-                        h1 {
-                            text-align: center;
-                            font-size: 24px;
-                            margin-bottom: 10px;
-                        }
-                        p {
-                            text-align: center;
-                            font-size: 14px;
-                            color: #555;
-                            margin-bottom: 20px;
-                        }
-                        table {
-                            width: 100%;
-                            border-collapse: collapse;
-                            font-size: 12px;
-                        }
-                        th, td {
-                            border: 1px solid #000;
-                            padding: 8px;
-                            text-align: left;
-                        }
-                        th {
-                            background-color: #f0f0f0;
-                            font-weight: bold;
-                            text-transform: uppercase;
-                        }
-                        tr:nth-child(even) {
-                            background-color: #f9f9f9;
-                        }
-                        .no-data {
-                            text-align: center;
-                            padding: 20px;
-                            font-style: italic;
-                        }
+                        body { font-family: Arial, sans-serif; margin: 20px; color: #000; }
+                        h1 { text-align: center; font-size: 24px; margin-bottom: 10px; }
+                        p { text-align: center; font-size: 14px; color: #555; margin-bottom: 20px; }
+                        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+                        th, td { border: 1px solid #000; padding: 8px; text-align: left; }
+                        th { background-color: #f0f0f0; font-weight: bold; text-transform: uppercase; }
+                        tr:nth-child(even) { background-color: #f9f9f9; }
+                        .no-data { text-align: center; padding: 20px; font-style: italic; }
                     </style>
                 </head>
                 <body>
@@ -304,6 +287,7 @@ const Controle = () => {
                         onChange={(e) => setFilters({ ...filters, typeSortie: e.target.value })}
                         className="p-2 border rounded"
                     >
+                        <option value="">Tous les types</option>
                         {TYPE_SORTIE_OPTIONS.map((option) => (
                             <option key={option.value} value={option.value}>
                                 {option.label}
@@ -357,41 +341,63 @@ const Controle = () => {
                             }}
                             className="grid grid-cols-2 gap-4"
                         >
-                            <input
-                                type="text"
-                                placeholder="N° OT"
-                                value={newItem.n_ot || ""}
-                                onChange={(e) => setNewItem({ ...newItem, n_ot: e.target.value })}
-                                className="p-2 border rounded"
-                                required
-                            />
-                            <input
-                                type="text"
-                                placeholder="BS"
-                                value={newItem.bs || ""}
-                                onChange={(e) => setNewItem({ ...newItem, bs: e.target.value })}
-                                className="p-2 border rounded"
-                            />
-                            <input
-                                type="text"
-                                placeholder="Commande d'achat"
-                                value={newItem.commande_achat || ""}
-                                onChange={(e) => setNewItem({ ...newItem, commande_achat: e.target.value })}
-                                className="p-2 border rounded"
-                            />
-                            <input
-                                type="text"
-                                placeholder="Nature de sortie"
-                                value={newItem.nature_sortie || ""}
-                                onChange={(e) => setNewItem({ ...newItem, nature_sortie: e.target.value })}
-                                className="p-2 border rounded"
-                            />
                             <select
-                                value={newItem.type_sortie || "BS"}
-                                onChange={(e) => setNewItem({ ...newItem, type_sortie: e.target.value })}
+                                value={newItem.type_sortie}
+                                onChange={(e) => setNewItem({ ...newItem, type_sortie: e.target.value, n_ot: "", bs: "", le: "", commande_achat: "" })}
                                 className="p-2 border rounded"
                             >
-                                {TYPE_SORTIE_OPTIONS.filter(option => option.value !== "").map((option) => (
+                                {TYPE_SORTIE_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                            {newItem.type_sortie === "OT" && (
+                                <input
+                                    type="text"
+                                    placeholder="N° OT"
+                                    value={newItem.n_ot || ""}
+                                    onChange={(e) => setNewItem({ ...newItem, n_ot: e.target.value })}
+                                    className="p-2 border rounded"
+                                    required
+                                />
+                            )}
+                            {newItem.type_sortie === "BS" && (
+                                <input
+                                    type="text"
+                                    placeholder="BS"
+                                    value={newItem.bs || ""}
+                                    onChange={(e) => setNewItem({ ...newItem, bs: e.target.value })}
+                                    className="p-2 border rounded"
+                                    required
+                                />
+                            )}
+                            {newItem.type_sortie === "LE" && (
+                                <input
+                                    type="text"
+                                    placeholder="LE"
+                                    value={newItem.le || ""}
+                                    onChange={(e) => setNewItem({ ...newItem, le: e.target.value })}
+                                    className="p-2 border rounded"
+                                    required
+                                />
+                            )}
+                            {newItem.type_sortie === "CMD" && (
+                                <input
+                                    type="text"
+                                    placeholder="Commande d'achat"
+                                    value={newItem.commande_achat || ""}
+                                    onChange={(e) => setNewItem({ ...newItem, commande_achat: e.target.value })}
+                                    className="p-2 border rounded"
+                                    required
+                                />
+                            )}
+                            <select
+                                value={newItem.nature_sortie}
+                                onChange={(e) => setNewItem({ ...newItem, nature_sortie: e.target.value })}
+                                className="p-2 border rounded"
+                            >
+                                {NATURE_SORTIE_OPTIONS.map((option) => (
                                     <option key={option.value} value={option.value}>
                                         {option.label}
                                     </option>
@@ -404,13 +410,36 @@ const Controle = () => {
                                 onChange={(e) => setNewItem({ ...newItem, n_reservation: e.target.value })}
                                 className="p-2 border rounded"
                             />
-                            <input
-                                type="text"
-                                placeholder="Local"
-                                value={newItem.local || ""}
-                                onChange={(e) => setNewItem({ ...newItem, local: e.target.value })}
+                            <select
+                                value={newItem.magasin}
+                                onChange={(e) => setNewItem({ ...newItem, magasin: e.target.value, local: "", responsable_local: "" })}
                                 className="p-2 border rounded"
-                            />
+                            >
+                                {MAGASIN_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label} - {RESPONSABLE_MAGASIN[option.value]}
+                                    </option>
+                                ))}
+                            </select>
+                            <select
+                                value={newItem.local}
+                                onChange={(e) => {
+                                    const selectedLocal = LOCAL_OPTIONS[newItem.magasin].find(loc => loc.value === e.target.value);
+                                    setNewItem({
+                                        ...newItem,
+                                        local: e.target.value,
+                                        responsable_local: selectedLocal?.responsable || ""
+                                    });
+                                }}
+                                className="p-2 border rounded"
+                            >
+                                <option value="">Sélectionner un local</option>
+                                {newItem.magasin && LOCAL_OPTIONS[newItem.magasin].map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
                             <input
                                 type="text"
                                 placeholder="Demandeur"
@@ -429,8 +458,8 @@ const Controle = () => {
                                 type="text"
                                 placeholder="Responsable local"
                                 value={newItem.responsable_local || ""}
-                                onChange={(e) => setNewItem({ ...newItem, responsable_local: e.target.value })}
-                                className="p-2 border rounded"
+                                readOnly
+                                className="p-2 border rounded bg-gray-100"
                             />
                             <button
                                 type="submit"

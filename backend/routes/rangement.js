@@ -2,335 +2,115 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 
-// GET / - Fetch storage data with pagination and precise search
+// GET / - Fetch storage data with pagination, precise search, and group by article
 router.get('/', async (req, res) => {
     try {
         const { search, page = 1 } = req.query;
         const limit = 25;
-        const offset = Math.max(0, (parseInt(page) - 1) * limit); // Prevent negative offset
+        const offset = Math.max(0, (parseInt(page) - 1) * limit);
 
-        // Initialize results
-        let stockResults = [], lsTacheResults = [], leTacheResults = [], leStatusResults = [], lsStatusResults = [];
-
-        // Query for current stock from stock_ewm
-        try {
-            let stockQuery = `
-                SELECT 
-                    CAST(article AS CHAR) COLLATE utf8mb4_unicode_ci AS article_code,
-                    designation_article AS description,
-                    quantite AS quantity,
-                    unite_qte_base AS unit,
-                    prix AS pmp,
-                    emplacement AS bin_location,
-                    CAST(magasin AS CHAR) COLLATE utf8mb4_unicode_ci AS warehouse,
-                    'current' AS source,
-                    NULL AS document
-                FROM stock_ewm
-                WHERE article IS NOT NULL
-            `;
-            let stockCountQuery = `SELECT COUNT(*) AS total FROM stock_ewm WHERE article IS NOT NULL`;
-            const stockParams = [];
-            if (search) {
-                stockQuery += ` AND (article = ? OR designation_article LIKE ?)`;
-                stockCountQuery += ` AND (article = ? OR designation_article LIKE ?)`;
-                stockParams.push(search, `%${search}%`);
-            }
-            stockQuery += ` ORDER BY article_code LIMIT ? OFFSET ?`;
-            stockParams.push(limit, offset);
-            console.log('stock_ewm query:', stockQuery, stockParams);
-            [stockResults] = await pool.query(stockQuery, stockParams);
-            const [stockCountResult] = await pool.query(stockCountQuery, stockParams.slice(0, -2));
-            console.log('stock_ewm count:', stockCountResult[0].total);
-        } catch (stockError) {
-            console.error('stock_ewm query error:', stockError.message, stockError.stack);
-        }
-
-        // Query for tasks from ls_tache
-        try {
-            let lsTacheQuery = `
-                SELECT 
-                    CAST(Produit AS CHAR) COLLATE utf8mb4_unicode_ci AS article_code,
-                    Designation_produit AS description,
-                    Qte_reelle_pren_UQB AS quantity,
-                    Unite_qte_base AS unit,
-                    NULL AS pmp,
-                    Emplacement_prenant AS bin_location,
-                    NULL AS warehouse,
-                    'task_prenant' AS source,
-                    Document AS document
-                FROM ls_tache
-                WHERE Produit IS NOT NULL AND Emplacement_prenant IS NOT NULL
-                UNION
-                SELECT 
-                    CAST(Produit AS CHAR) COLLATE utf8mb4_unicode_ci AS article_code,
-                    Designation_produit AS description,
-                    Qte_reelle_pren_UQB AS quantity,
-                    Unite_qte_base AS unit,
-                    NULL AS pmp,
-                    Emplacement_cedant AS bin_location,
-                    NULL AS warehouse,
-                    'task_cedant' AS source,
-                    Document AS document
-                FROM ls_tache
-                WHERE Produit IS NOT NULL AND Emplacement_cedant IS NOT NULL
-            `;
-            let lsTacheCountQuery = `
-                SELECT COUNT(*) AS total FROM (
-                    SELECT Produit FROM ls_tache WHERE Produit IS NOT NULL AND Emplacement_prenant IS NOT NULL
-                    UNION
-                    SELECT Produit FROM ls_tache WHERE Produit IS NOT NULL AND Emplacement_cedant IS NOT NULL
-                ) AS t
-            `;
-            const lsTacheParams = [];
-            if (search) {
-                lsTacheQuery += ` AND (Produit = ? OR Designation_produit LIKE ?)`;
-                lsTacheCountQuery += ` WHERE Produit = ? OR Designation_produit LIKE ?`;
-                lsTacheParams.push(search, `%${search}%`);
-            }
-            lsTacheQuery += ` ORDER BY article_code LIMIT ? OFFSET ?`;
-            lsTacheParams.push(limit, offset);
-            console.log('ls_tache query:', lsTacheQuery, lsTacheParams);
-            [lsTacheResults] = await pool.query(lsTacheQuery, lsTacheParams);
-            const [lsTacheCountResult] = await pool.query(lsTacheCountQuery, lsTacheParams.slice(0, -2));
-            console.log('ls_tache count:', lsTacheCountResult[0].total);
-        } catch (lsTacheError) {
-            console.error('ls_tache query error:', lsTacheError.message, lsTacheError.stack);
-        }
-
-        // Query for tasks from le_tache
-        try {
-            let leTacheQuery = `
-                SELECT 
-                    CAST(Produit AS CHAR) COLLATE utf8mb4_unicode_ci AS article_code,
-                    Designation_produit AS description,
-                    Qte_reelle_pren_UQB AS quantity,
-                    Unite_qte_base AS unit,
-                    NULL AS pmp,
-                    Emplacement_prenant AS bin_location,
-                    NULL AS warehouse,
-                    'task_prenant' AS source,
-                    Document AS document
-                FROM le_tache
-                WHERE Produit IS NOT NULL AND Emplacement_prenant IS NOT NULL
-                UNION
-                SELECT 
-                    CAST(Produit AS CHAR) COLLATE utf8mb4_unicode_ci AS article_code,
-                    Designation_produit AS description,
-                    Qte_reelle_pren_UQB AS quantity,
-                    Unite_qte_base AS unit,
-                    NULL AS pmp,
-                    Emplacement_cedant AS bin_location,
-                    NULL AS warehouse,
-                    'task_cedant' AS source,
-                    Document AS document
-                FROM le_tache
-                WHERE Produit IS NOT NULL AND Emplacement_cedant IS NOT NULL
-            `;
-            let leTacheCountQuery = `
-                SELECT COUNT(*) AS total FROM (
-                    SELECT Produit FROM le_tache WHERE Produit IS NOT NULL AND Emplacement_prenant IS NOT NULL
-                    UNION
-                    SELECT Produit FROM le_tache WHERE Produit IS NOT NULL AND Emplacement_cedant IS NOT NULL
-                ) AS t
-            `;
-            const leTacheParams = [];
-            if (search) {
-                leTacheQuery += ` AND (Produit = ? OR Designation_produit LIKE ?)`;
-                leTacheCountQuery += ` WHERE Produit = ? OR Designation_produit LIKE ?`;
-                leTacheParams.push(search, `%${search}%`);
-            }
-            leTacheQuery += ` ORDER BY article_code LIMIT ? OFFSET ?`;
-            leTacheParams.push(limit, offset);
-            console.log('le_tache query:', leTacheQuery, leTacheParams);
-            [leTacheResults] = await pool.query(leTacheQuery, leTacheParams);
-            const [leTacheCountResult] = await pool.query(leTacheCountQuery, leTacheParams.slice(0, -2));
-            console.log('le_tache count:', leTacheCountResult[0].total);
-        } catch (leTacheError) {
-            console.error('le_tache query error:', leTacheError.message, leTacheError.stack);
-        }
-
-        // Query for status from le_status
-        try {
-            let leStatusQuery = `
-                SELECT 
-                    NULL AS article_code,
-                    NULL AS description,
-                    NULL AS quantity,
-                    NULL AS unit,
-                    NULL AS pmp,
-                    NULL AS bin_location,
-                    CAST(site_cedant AS CHAR) COLLATE utf8mb4_unicode_ci AS warehouse,
-                    'status_cedant' AS source,
-                    Document AS document
-                FROM le_status
-                WHERE site_cedant IS NOT NULL
-                AND Document IN (
-                    SELECT Document FROM ls_tache WHERE Produit IS NOT NULL AND (Produit = ? OR Designation_produit LIKE ?)
-                    UNION
-                    SELECT Document FROM le_tache WHERE Produit IS NOT NULL AND (Produit = ? OR Designation_produit LIKE ?)
-                )
-            `;
-            let leStatusCountQuery = `
-                SELECT COUNT(*) AS total 
-                FROM le_status 
-                WHERE site_cedant IS NOT NULL
-                AND Document IN (
-                    SELECT Document FROM ls_tache WHERE Produit IS NOT NULL AND (Produit = ? OR Designation_produit LIKE ?)
-                    UNION
-                    SELECT Document FROM le_tache WHERE Produit IS NOT NULL AND (Produit = ? OR Designation_produit LIKE ?)
-                )
-            `;
-            const leStatusParams = [search || '', `%${search || ''}%`, search || '', `%${search || ''}%`];
-            if (search) {
-                leStatusQuery += ` AND site_cedant LIKE ?`;
-                leStatusCountQuery += ` AND site_cedant LIKE ?`;
-                leStatusParams.push(`%${search}%`);
-            }
-            leStatusQuery += ` ORDER BY warehouse LIMIT ? OFFSET ?`;
-            leStatusParams.push(limit, offset);
-            console.log('le_status query:', leStatusQuery, leStatusParams);
-            [leStatusResults] = await pool.query(leStatusQuery, leStatusParams);
-            const [leStatusCountResult] = await pool.query(leStatusCountQuery, leStatusParams.slice(0, search ? 5 : 4));
-            console.log('le_status count:', leStatusCountResult[0].total);
-        } catch (leStatusError) {
-            console.error('le_status query error:', leStatusError.message, leStatusError.stack);
-        }
-
-        // Query for status from ls_status
-        try {
-            let lsStatusQuery = `
-                SELECT 
-                    NULL AS article_code,
-                    NULL AS description,
-                    NULL AS quantity,
-                    NULL AS unit,
-                    NULL AS pmp,
-                    NULL AS bin_location,
-                    CAST(site_prenant AS CHAR) COLLATE utf8mb4_unicode_ci AS warehouse,
-                    'status_prenant' AS source,
-                    Document AS document
-                FROM ls_status
-                WHERE site_prenant IS NOT NULL
-                AND Document IN (
-                    SELECT Document FROM ls_tache WHERE Produit IS NOT NULL AND (Produit = ? OR Designation_produit LIKE ?)
-                    UNION
-                    SELECT Document FROM le_tache WHERE Produit IS NOT NULL AND (Produit = ? OR Designation_produit LIKE ?)
-                )
-            `;
-            let lsStatusCountQuery = `
-                SELECT COUNT(*) AS total 
-                FROM ls_status 
-                WHERE site_prenant IS NOT NULL
-                AND Document IN (
-                    SELECT Document FROM ls_tache WHERE Produit IS NOT NULL AND (Produit = ? OR Designation_produit LIKE ?)
-                    UNION
-                    SELECT Document FROM le_tache WHERE Produit IS NOT NULL AND (Produit = ? OR Designation_produit LIKE ?)
-                )
-            `;
-            const lsStatusParams = [search || '', `%${search || ''}%`, search || '', `%${search || ''}%`];
-            if (search) {
-                lsStatusQuery += ` AND site_prenant LIKE ?`;
-                lsStatusCountQuery += ` AND site_prenant LIKE ?`;
-                lsStatusParams.push(`%${search}%`);
-            }
-            lsStatusQuery += ` ORDER BY warehouse LIMIT ? OFFSET ?`;
-            lsStatusParams.push(limit, offset);
-            console.log('ls_status query:', lsStatusQuery, lsStatusParams);
-            [lsStatusResults] = await pool.query(lsStatusQuery, lsStatusParams);
-            const [lsStatusCountResult] = await pool.query(lsStatusCountQuery, lsStatusParams.slice(0, search ? 5 : 4));
-            console.log('ls_status count:', lsStatusCountResult[0].total);
-        } catch (lsStatusError) {
-            console.error('ls_status query error:', lsStatusError.message, lsStatusError.stack);
-        }
-
-        // Combine results
-        const combinedResults = [
-            ...stockResults,
-            ...lsTacheResults,
-            ...leTacheResults,
-            ...leStatusResults,
-            ...lsStatusResults
-        ].filter(row => row.article_code || row.warehouse);
-
-        // Log combined results for debugging
-        console.log('Combined results before sort:', combinedResults.map(row => ({
-            article_code: { value: row.article_code, type: typeof row.article_code },
-            warehouse: { value: row.warehouse, type: typeof row.warehouse }
-        })));
-
-        // Create a new array for sorting to avoid mutating combinedResults
-        const sortedResults = [...combinedResults].sort((a, b) => {
-            const aCode = a.article_code != null ? String(a.article_code) : '';
-            const bCode = b.article_code != null ? String(b.article_code) : '';
-            if (aCode && bCode) return aCode.localeCompare(bCode);
-            if (aCode) return -1;
-            if (bCode) return 1;
-            const aWarehouse = a.warehouse != null ? String(a.warehouse) : '';
-            const bWarehouse = b.warehouse != null ? String(b.warehouse) : '';
-            return aWarehouse.localeCompare(bWarehouse) || 0;
-        });
-
-        // Calculate total unique records
-        const totalRecordsQuery = `
-            SELECT COUNT(DISTINCT COALESCE(article_code, warehouse)) AS total
-            FROM (
-                SELECT CAST(article AS CHAR) COLLATE utf8mb4_unicode_ci AS article_code, 
-                       CAST(magasin AS CHAR) COLLATE utf8mb4_unicode_ci AS warehouse 
-                FROM stock_ewm 
-                WHERE article IS NOT NULL
-                UNION
-                SELECT CAST(Produit AS CHAR) COLLATE utf8mb4_unicode_ci, NULL 
-                FROM ls_tache 
-                WHERE Produit IS NOT NULL AND Emplacement_prenant IS NOT NULL
-                UNION
-                SELECT CAST(Produit AS CHAR) COLLATE utf8mb4_unicode_ci, NULL 
-                FROM ls_tache 
-                WHERE Produit IS NOT NULL AND Emplacement_cedant IS NOT NULL
-                UNION
-                SELECT CAST(Produit AS CHAR) COLLATE utf8mb4_unicode_ci, NULL 
-                FROM le_tache 
-                WHERE Produit IS NOT NULL AND Emplacement_prenant IS NOT NULL
-                UNION
-                SELECT CAST(Produit AS CHAR) COLLATE utf8mb4_unicode_ci, NULL 
-                FROM le_tache 
-                WHERE Produit IS NOT NULL AND Emplacement_cedant IS NOT NULL
-                UNION
-                SELECT NULL, CAST(site_cedant AS CHAR) COLLATE utf8mb4_unicode_ci 
-                FROM le_status 
-                WHERE site_cedant IS NOT NULL
-                AND Document IN (
-                    SELECT Document FROM ls_tache WHERE Produit IS NOT NULL AND (Produit = ? OR Designation_produit LIKE ?)
-                    UNION
-                    SELECT Document FROM le_tache WHERE Produit IS NOT NULL AND (Produit = ? OR Designation_produit LIKE ?)
-                )
-                UNION
-                SELECT NULL, CAST(site_prenant AS CHAR) COLLATE utf8mb4_unicode_ci 
-                FROM ls_status 
-                WHERE site_prenant IS NOT NULL
-                AND Document IN (
-                    SELECT Document FROM ls_tache WHERE Produit IS NOT NULL AND (Produit = ? OR Designation_produit LIKE ?)
-                    UNION
-                    SELECT Document FROM le_tache WHERE Produit IS NOT NULL AND (Produit = ? OR Designation_produit LIKE ?)
-                )
-            ) AS combined
+        // Query for stock data with migration join and group by article
+        let stockQuery = `
+            SELECT 
+                s.article AS article_code,
+                MAX(s.designation_article) AS description,
+                MAX(s.numero_magasin) AS numero_magasin,
+                MAX(s.division) AS division,
+                MAX(s.magasin) AS warehouse,
+                MAX(s.emplacement) AS bin_location,
+                MAX(s.type_magasin) AS type_magasin,
+                SUM(s.quantite) AS quantity,
+                MAX(s.unite_qte_base) AS unit,
+                MAX(s.type_stock) AS type_stock,
+                MAX(s.designation_type_stock) AS designation_type_stock,
+                MAX(s.groupe_valorisation) AS groupe_valorisation,
+                MAX(s.prix) AS pmp,
+                SUM(s.valeur_stock) AS valeur_stock,
+                MAX(s.devise) AS devise,
+                MAX(s.date_em) AS date_em,
+                MAX(s.derniere_sortie) AS derniere_sortie,
+                MAX(s.name_file) AS name_file,
+                MAX(m.Marque) AS Marque,
+                MAX(m.Oracle_item_code) AS Oracle_item_code,
+                MAX(m.DESCRIPTION) AS migration_description,
+                MAX(m.Qté_validée_SAP) AS Qté_validée_SAP,
+                MAX(m.SAP_Material) AS SAP_Material,
+                MAX(m.PLANT) AS PLANT,
+                MAX(m.Plant_Validé) AS Plant_Validé,
+                MAX(m.Storage_Location) AS Storage_Location,
+                MAX(m.Storage_location_Validé) AS Storage_location_Validé,
+                MAX(m.local) AS local,
+                MAX(m.BIN_SAP) AS BIN_SAP,
+                MAX(m.Nombre_de_bin_NX) AS Nombre_de_bin_NX,
+                GROUP_CONCAT(
+                    CONCAT(m.bin, ':', 
+                        CASE 
+                            WHEN m.QTE_NX IS NOT NULL THEN FORMAT(m.QTE_NX, 3)
+                            ELSE 'N/A'
+                        END
+                    ) 
+                    SEPARATOR ', '
+                ) AS bins_with_qte_nx
+            FROM stock_ewm s
+            LEFT JOIN migration m ON s.article = m.SAP_Material
+            WHERE s.article IS NOT NULL
         `;
-        const totalRecordsParams = search ? [search, `%${search}%`, search, `%${search}%`, search, `%${search}%`, search, `%${search}%`] : ['', '', '', '', '', '', '', ''];
+        let stockCountQuery = `
+            SELECT COUNT(DISTINCT s.article) AS total 
+            FROM stock_ewm s
+            LEFT JOIN migration m ON s.article = m.SAP_Material
+            WHERE s.article IS NOT NULL
+        `;
+        const stockParams = [];
         if (search) {
-            totalRecordsQuery += `
-                WHERE article_code = ? OR article_code LIKE ? OR warehouse LIKE ?
-            `;
-            totalRecordsParams.push(search, `%${search}%`, `%${search}%`);
+            stockQuery += ` AND (s.article = ? OR s.designation_article LIKE ? OR m.Marque LIKE ? OR m.DESCRIPTION LIKE ?)`;
+            stockCountQuery += ` AND (s.article = ? OR s.designation_article LIKE ? OR m.Marque LIKE ? OR m.DESCRIPTION LIKE ?)`;
+            stockParams.push(search, `%${search}%`, `%${search}%`, `%${search}%`);
         }
-        console.log('totalRecords query:', totalRecordsQuery, totalRecordsParams);
-        const [totalRecordsResult] = await pool.query(totalRecordsQuery, totalRecordsParams);
-        const totalRecords = totalRecordsResult[0].total;
+        stockQuery += ` GROUP BY s.article ORDER BY s.article LIMIT ? OFFSET ?`;
+        stockParams.push(limit, offset);
 
-        // Apply pagination to combined results
-        const start = Math.max(0, (parseInt(page) - 1) * limit);
-        const paginatedResults = sortedResults.slice(start, start + limit);
+        const [stockResults] = await pool.query(stockQuery, stockParams);
+        const [stockCountResult] = await pool.query(stockCountQuery, stockParams.slice(0, -2));
+        const totalRecords = stockCountResult[0].total;
+
+        // Format results
+        const formattedResults = stockResults.map(item => ({
+            article_code: item.article_code,
+            description: item.description,
+            numero_magasin: item.numero_magasin,
+            division: item.division,
+            warehouse: item.warehouse,
+            bin_location: item.bin_location,
+            type_magasin: item.type_magasin,
+            quantity: item.quantity,
+            unit: item.unit,
+            type_stock: item.type_stock,
+            designation_type_stock: item.designation_type_stock,
+            groupe_valorisation: item.groupe_valorisation,
+            pmp: item.pmp,
+            valeur_stock: item.valeur_stock,
+            devise: item.devise,
+            date_em: item.date_em,
+            derniere_sortie: item.derniere_sortie,
+            name_file: item.name_file,
+            Marque: item.Marque,
+            Oracle_item_code: item.Oracle_item_code,
+            migration_description: item.migration_description,
+            Qté_validée_SAP: item.Qté_validée_SAP,
+            SAP_Material: item.SAP_Material,
+            PLANT: item.PLANT,
+            Plant_Validé: item.Plant_Validé,
+            Storage_Location: item.Storage_Location,
+            Storage_location_Validé: item.Storage_location_Validé,
+            local: item.local,
+            BIN_SAP: item.BIN_SAP,
+            Nombre_de_bin_NX: item.Nombre_de_bin_NX,
+            bins_with_qte_nx: item.bins_with_qte_nx || 'N/A'
+        }));
 
         res.json({
-            data: paginatedResults,
+            data: formattedResults,
             totalRecords,
             currentPage: parseInt(page),
             totalPages: Math.ceil(totalRecords / limit) || 1
