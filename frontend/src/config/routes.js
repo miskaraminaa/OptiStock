@@ -22,6 +22,8 @@ const Rotations = lazy(() => import('../pages/protected/Rotations'));
 const Explorer = lazy(() => import('../pages/protected/Explorer'));
 const Controle = lazy(() => import('../pages/protected/Controle'));
 const Rangement = lazy(() => import('../pages/protected/Rangement'));
+const RangementLE = lazy(() => import('../pages/protected/RangementLE'));
+
 const ForgotPassword = lazy(() => import('../pages/ForgotPassword'));
 
 const iconClasses = `h-6 w-6`;
@@ -72,11 +74,18 @@ const routes = [
         name: 'Explorer Articles',
     },
     {
+        path: '/app/rangementle',
+        component: RangementLE,
+        icon: <ArchiveBoxIcon className={iconClasses} />, // Remplacement par ArchiveBoxIcon
+        name: 'Guide au rangement LE',
+    },
+    {
         path: '/app/rangement',
         component: Rangement,
         icon: <ArchiveBoxIcon className={iconClasses} />, // Remplacement par ArchiveBoxIcon
-        name: 'Guide au rangement',
+        name: 'Guide au rangement global',
     },
+
     {
         path: '/app/charts',
         component: Charts,

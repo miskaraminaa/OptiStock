@@ -21,16 +21,18 @@ const Controle = () => {
     const [newItem, setNewItem] = useState({
         type_sortie: "OT",
         nature_sortie: "normal",
-        magasin: "Magasin"
+        magasin: "Magasin",
+        articles: [], // Array of { article, designation_article, quantity }
     });
+    const [mb51Articles, setMb51Articles] = useState([]); // Store articles from mb51
 
     const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
     const COLUMNS = [
         { header: "N° OT", key: "n_ot" },
-        { header: "BS", key: "bs" },
-        { header: "LE", key: "le" },
-        { header: "Commande d'achat", key: "commande_achat" },
+        { header: "N° BS", key: "bs" },
+        { header: "N° LE", key: "le" },
+        { header: "N° STO", key: "commande_achat" },
         { header: "Nature de sortie", key: "nature_sortie" },
         { header: "Type de sortie", key: "type_sortie" },
         { header: "N° Réservation", key: "n_reservation" },
@@ -39,13 +41,14 @@ const Controle = () => {
         { header: "Demandeur", key: "demandeur" },
         { header: "Préparateur", key: "preparateur" },
         { header: "Responsable local", key: "responsable_local" },
+        { header: "Articles", key: "articles" },
     ];
 
     const TYPE_SORTIE_OPTIONS = [
         { value: "OT", label: "OT" },
         { value: "BS", label: "BS" },
         { value: "LE", label: "LE" },
-        { value: "CMD", label: "Commande" },
+        { value: "STO", label: "STO" },
     ];
 
     const NATURE_SORTIE_OPTIONS = [
@@ -57,29 +60,45 @@ const Controle = () => {
     const MAGASIN_OPTIONS = [
         { value: "Magasin", label: "Magasin" },
         { value: "Magasin EPI", label: "Magasin EPI" },
+        { value: "Parc Exterieur", label: "Parc Exterieur" },
     ];
 
     const LOCAL_OPTIONS = {
         "Magasin": [
-            { value: "MSLE", label: "MSLE - BOUZIT LAHSSAN", responsable: "BOUZIT LAHSSAN" },
-            { value: "MSLT", label: "MSLT - BOUZIT LAHSSAN", responsable: "BOUZIT LAHSSAN" },
-            { value: "MSLV", label: "MSLV - BENDADA MOHAMMED", responsable: "BENDADA MOHAMMED" },
-            { value: "MSRL", label: "MSRL - BENDADA MOHAMMED", responsable: "BENDADA MOHAMMED" },
-            { value: "MSGP", label: "MSGP - BENDADA MOHAMMED", responsable: "BENDADA MOHAMMED" },
-            { value: "MSLL", label: "MSLL - BENDADA MOHAMMED", responsable: "BENDADA MOHAMMED" },
-            { value: "MSPC", label: "MSPC - BENDADA MOHAMMED", responsable: "BENDADA MOHAMMED" },
-            { value: "DSED", label: "DSED - BENDADA MOHAMMED", responsable: "BENDADA MOHAMMED" },
+            { value: "MSLE", label: "MSLE/MSLT - BOUZIT LAHSSAN", responsable: "BOUZIT LAHSSAN" },
+            { value: "MSLV", label: "MSLV/MSRL/MSGP/MSLL/MSPC/DSED - BENDADA MOHAMMED", responsable: "BENDADA MOHAMMED" },
         ],
         "Magasin EPI": [
             { value: "MSFE", label: "MSFE - BOUALLAK NOURDINE", responsable: "BOUALLAK NOURDINE" },
-            { value: "P-ext", label: "P-ext - SARGALI YOUSSEF", responsable: "SARGALI YOUSSEF" },
+        ],
+        "Parc Exterieur": [
+            { value: "PEXT", label: "PEXT/el kouhail abdelmajid", responsable: "el kouhail abdelmajid" },
         ],
     };
 
     const RESPONSABLE_MAGASIN = {
         "Magasin": "JAMAL RHENNAOUI",
         "Magasin EPI": "ELBAHI AMINE",
+        "Parc Exterieur": "SARGALI YOUSSEF",
     };
+
+    const fetchMb51Articles = async () => {
+        try {
+            const res = await fetch(`${BASE_URL}/controle/mb51/articles`);
+            console.log('Fetch response:', res.status, res.statusText);
+            if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+            const articles = await res.json();
+            console.log('Fetched articles:', articles);
+            setMb51Articles(articles);
+        } catch (err) {
+            setError(`Échec du chargement des articles : ${err.message}`);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
+        fetchMb51Articles();
+    }, [filters]);
 
     const fetchData = async () => {
         setIsLoadingData(true);
@@ -112,6 +131,7 @@ const Controle = () => {
                 demandeur: item.demandeur ? item.demandeur.trim() : "",
                 preparateur: item.preparateur ? item.preparateur.trim() : "",
                 responsable_local: item.responsable_local ? item.responsable_local.trim() : "",
+                articles: typeof item.articles === 'string' ? JSON.parse(item.articles || '[]') : item.articles || [],
             }));
             setData(normalizedData);
             applyFilters(normalizedData);
@@ -142,10 +162,6 @@ const Controle = () => {
         setFilteredData(filtered);
     };
 
-    useEffect(() => {
-        fetchData();
-    }, [filters]);
-
     const toggleItem = (index) => {
         const newSelected = new Set(selectedItems);
         if (newSelected.has(index)) {
@@ -156,19 +172,86 @@ const Controle = () => {
         setSelectedItems(newSelected);
     };
 
+    const addArticle = (article, designation_article) => {
+        if (!newItem.articles.some(a => a.article === article)) {
+            setNewItem(prev => ({
+                ...prev,
+                articles: [...prev.articles, { article, designation_article, quantity: 0 }],
+            }));
+        }
+    };
+
+    const updateQuantity = (index, value) => {
+        const updatedArticles = [...newItem.articles];
+        updatedArticles[index].quantity = value || 0;
+        setNewItem(prev => ({
+            ...prev,
+            articles: updatedArticles,
+        }));
+    };
+
+    const removeArticle = (index) => {
+        const updatedArticles = [...newItem.articles];
+        updatedArticles.splice(index, 1);
+        setNewItem(prev => ({
+            ...prev,
+            articles: updatedArticles,
+        }));
+    };
+
     const updateItems = async (action) => {
         try {
             if (action === "add" && newItem) {
                 const selectedLocal = LOCAL_OPTIONS[newItem.magasin]?.find(loc => loc.value === newItem.local);
+                console.log('New Item before validation:', newItem); // Debug log
+                // Validate and set default values
+                let n_ot = newItem.n_ot || '';
+                let bs = newItem.bs || '';
+                let le = newItem.le || '';
+                let commande_achat = newItem.commande_achat || '';
+
+                if (newItem.type_sortie === "OT" && (!n_ot || n_ot.trim() === '')) {
+                    n_ot = `OT${moment().format("YYYYMMDDHHmmss")}`;
+                    console.log('Generated n_ot:', n_ot); // Debug log
+                }
+                if (newItem.type_sortie === "BS" && (!bs || bs.trim() === '')) {
+                    bs = `BS${moment().format("YYYYMMDDHHmmss")}`;
+                }
+                if (newItem.type_sortie === "LE" && (!le || le.trim() === '')) {
+                    le = `LE${moment().format("YYYYMMDDHHmmss")}`;
+                }
+                if (newItem.type_sortie === "STO" && (!commande_achat || commande_achat.trim() === '')) {
+                    commande_achat = `STO${moment().format("YYYYMMDDHHmmss")}`;
+                }
+
+                if (newItem.type_sortie === "OT" && !n_ot) {
+                    throw new Error("Le N° OT est requis pour un type de sortie OT.");
+                }
+                if (newItem.type_sortie === "BS" && !bs) {
+                    throw new Error("Le BS est requis pour un type de sortie BS.");
+                }
+                if (newItem.type_sortie === "LE" && !le) {
+                    throw new Error("Le LE est requis pour un type de sortie LE.");
+                }
+                if (newItem.type_sortie === "STO" && !commande_achat) {
+                    throw new Error("La commande d'achat est requise pour un type de sortie STO.");
+                }
+
                 const itemToAdd = {
                     ...newItem,
-                    n_ot: newItem.type_sortie === "OT" ? newItem.n_ot || `OT${moment().format("YYYYMMDDHHmmss")}` : "",
-                    bs: newItem.type_sortie === "BS" ? newItem.bs || `BS${moment().format("YYYYMMDDHHmmss")}` : "",
-                    le: newItem.type_sortie === "LE" ? newItem.le || `LE${moment().format("YYYYMMDDHHmmss")}` : "",
-                    commande_achat: newItem.type_sortie === "CMD" ? newItem.commande_achat || `CMD${moment().format("YYYYMMDDHHmmss")}` : "",
+                    n_ot,
+                    bs,
+                    le,
+                    commande_achat,
                     responsable_local: selectedLocal?.responsable || newItem.responsable_local || "",
                     magasin: newItem.magasin || "Magasin",
+                    articles: newItem.articles.map(a => ({
+                        article: a.article,
+                        designation_article: a.designation_article,
+                        quantity: a.quantity || 0,
+                    })),
                 };
+                console.log('Item to send:', itemToAdd); // Debug log
                 const res = await fetch(`${BASE_URL}/controle/update`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -176,7 +259,7 @@ const Controle = () => {
                 });
                 if (!res.ok) throw new Error((await res.json()).error || "Erreur lors de l'ajout");
                 setShowAddForm(false);
-                setNewItem({ type_sortie: "OT", nature_sortie: "normal", magasin: "Magasin" });
+                setNewItem({ type_sortie: "OT", nature_sortie: "normal", magasin: "Magasin", articles: [] });
                 await fetchData();
             } else if (action === "remove" && selectedItems.size > 0) {
                 const nOtsToRemove = Array.from(selectedItems).map(index => filteredData[index].n_ot);
@@ -249,7 +332,7 @@ const Controle = () => {
                 : filteredData.map(row => `
                                         <tr>
                                             ${COLUMNS.map(col => `
-                                                <td>${row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : ''}</td>
+                                                <td>${col.key === 'articles' && row[col.key] ? (Array.isArray(row[col.key]) ? row[col.key].map(a => `${a.article} (${a.quantity})`).join(', ') : row[col.key]) : (row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : '')}</td>
                                             `).join('')}
                                         </tr>
                                     `).join('')
@@ -382,10 +465,10 @@ const Controle = () => {
                                     required
                                 />
                             )}
-                            {newItem.type_sortie === "CMD" && (
+                            {newItem.type_sortie === "STO" && (
                                 <input
                                     type="text"
-                                    placeholder="Commande d'achat"
+                                    placeholder="STO"
                                     value={newItem.commande_achat || ""}
                                     onChange={(e) => setNewItem({ ...newItem, commande_achat: e.target.value })}
                                     className="p-2 border rounded"
@@ -461,6 +544,75 @@ const Controle = () => {
                                 readOnly
                                 className="p-2 border rounded bg-gray-100"
                             />
+                            <div className="col-span-2">
+                                <h4 className="text-md font-semibold mb-2">Ajouter des articles</h4>
+                                <select
+                                    onChange={(e) => {
+                                        const [article, designation_article] = e.target.value.split(" - ");
+                                        if (article && designation_article && !newItem.articles.some(a => a.article === article)) {
+                                            addArticle(article, designation_article);
+                                        }
+                                        e.target.value = ""; // Reset dropdown
+                                    }}
+                                    className="p-2 border rounded w-full mb-2"
+                                >
+                                    <option value="">Sélectionner un article</option>
+                                    {mb51Articles && mb51Articles.length > 0 ? (
+                                        [...new Set(mb51Articles.map(a => a.article))].map(article => {
+                                            const designation = mb51Articles.find(a => a.article === article)?.designation_article;
+                                            return (
+                                                <option key={article} value={`${article} - ${designation}`}>
+                                                    {article} - {designation}
+                                                </option>
+                                            );
+                                        })
+                                    ) : (
+                                        <option disabled>Aucun article disponible</option>
+                                    )}
+                                </select>
+                                {newItem.articles.length > 0 && (
+                                    <div className="mt-2 overflow-x-auto">
+                                        <table className="w-full text-sm border-collapse">
+                                            <thead>
+                                                <tr className="bg-gray-100">
+                                                    <th className="border p-2 text-left">Code</th>
+                                                    <th className="border p-2 text-left">Désignation</th>
+                                                    <th className="border p-2 text-left">Quantité</th>
+                                                    <th className="border p-2 text-left">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {newItem.articles.map((article, index) => (
+                                                    <tr key={article.article} className="hover:bg-gray-50">
+                                                        <td className="border p-2">{article.article}</td>
+                                                        <td className="border p-2">{article.designation_article}</td>
+                                                        <td className="border p-2">
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                value={article.quantity}
+                                                                onChange={(e) => updateQuantity(index, e.target.value)}
+                                                                className="p-1 border rounded w-20"
+                                                                placeholder="Quantité"
+                                                            />
+                                                        </td>
+                                                        <td className="border p-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removeArticle(index)}
+                                                                className="text-red-500 hover:text-red-700"
+                                                            >
+                                                                <TrashIcon className="h-5 w-5" />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                                {newItem.articles.length === 0 && <p className="text-gray-500 italic">Aucun article sélectionné.</p>}
+                            </div>
                             <button
                                 type="submit"
                                 className="col-span-2 bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
@@ -519,7 +671,7 @@ const Controle = () => {
                                         </td>
                                         {COLUMNS.map((col) => (
                                             <td key={col.key} className="px-4 py-2">
-                                                {row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : ""}
+                                                {col.key === 'articles' && row[col.key] ? (Array.isArray(row[col.key]) ? row[col.key].map(a => `${a.article} (${a.quantity})`).join(', ') : JSON.parse(row[col.key]).map(a => `${a.article} (${a.quantity})`).join(', ')) : (row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : '')}
                                             </td>
                                         ))}
                                         <td className="px-4 py-2">

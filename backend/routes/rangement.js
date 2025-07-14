@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 
-// GET / - Fetch storage data with pagination, precise search, and group by article
+// GET / - Fetch storage data with pagination, precise search, and group by article with Storage_Location and Bins
 router.get('/', async (req, res) => {
     try {
         const { search, page = 1 } = req.query;
@@ -29,27 +29,28 @@ router.get('/', async (req, res) => {
                 MAX(s.devise) AS devise,
                 MAX(s.date_em) AS date_em,
                 MAX(s.derniere_sortie) AS derniere_sortie,
-                MAX(s.name_file) AS name_file,
                 MAX(m.Marque) AS Marque,
                 MAX(m.Oracle_item_code) AS Oracle_item_code,
                 MAX(m.DESCRIPTION) AS migration_description,
-                MAX(m.Qté_validée_SAP) AS Qté_validée_SAP,
+                SUM(m.Qté_validée_SAP) AS Qté_validée_SAP,
                 MAX(m.SAP_Material) AS SAP_Material,
                 MAX(m.PLANT) AS PLANT,
                 MAX(m.Plant_Validé) AS Plant_Validé,
-                MAX(m.Storage_Location) AS Storage_Location,
+                GROUP_CONCAT(DISTINCT m.Storage_Location SEPARATOR '\n') AS Storage_Location,
                 MAX(m.Storage_location_Validé) AS Storage_location_Validé,
                 MAX(m.local) AS local,
                 MAX(m.BIN_SAP) AS BIN_SAP,
                 MAX(m.Nombre_de_bin_NX) AS Nombre_de_bin_NX,
-                GROUP_CONCAT(
-                    CONCAT(m.bin, ':', 
+                GROUP_CONCAT(DISTINCT
+                    CONCAT(
+                        m.Storage_Location, ' - ',
+                        m.bin, ' - ',
                         CASE 
                             WHEN m.QTE_NX IS NOT NULL THEN FORMAT(m.QTE_NX, 3)
                             ELSE 'N/A'
                         END
                     ) 
-                    SEPARATOR ', '
+                    SEPARATOR '\n'
                 ) AS bins_with_qte_nx
             FROM stock_ewm s
             LEFT JOIN migration m ON s.article = m.SAP_Material
@@ -93,7 +94,6 @@ router.get('/', async (req, res) => {
             devise: item.devise,
             date_em: item.date_em,
             derniere_sortie: item.derniere_sortie,
-            name_file: item.name_file,
             Marque: item.Marque,
             Oracle_item_code: item.Oracle_item_code,
             migration_description: item.migration_description,

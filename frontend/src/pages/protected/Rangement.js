@@ -78,7 +78,7 @@ const Rangement = () => {
         if (!Array.isArray(data) || data.length === 0) {
             return (
                 <tr>
-                    <td colSpan={30} className="py-1 px-2 border text-center text-gray-500 text-sm">
+                    <td colSpan={29} className="py-1 px-2 border text-center text-gray-500 text-sm">
                         Aucune donnée disponible
                     </td>
                 </tr>
@@ -111,7 +111,6 @@ const Rangement = () => {
                 <td className="py-1 px-2 border text-sm min-w-[60px]">{item.devise || 'N/A'}</td>
                 <td className="py-1 px-2 border text-sm min-w-[100px]">{item.date_em || 'N/A'}</td>
                 <td className="py-1 px-2 border text-sm min-w-[100px]">{item.derniere_sortie || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[150px] whitespace-normal break-words">{item.name_file || 'N/A'}</td>
                 <td className="py-1 px-2 border text-sm min-w-[100px]">{item.Marque || 'N/A'}</td>
                 <td className="py-1 px-2 border text-sm min-w-[120px]">{item.Oracle_item_code || 'N/A'}</td>
                 <td className="py-1 px-2 border text-sm min-w-[200px] whitespace-normal break-words">{item.migration_description || 'N/A'}</td>
@@ -119,11 +118,15 @@ const Rangement = () => {
                 <td className="py-1 px-2 border text-sm min-w-[100px]">{item.SAP_Material || 'N/A'}</td>
                 <td className="py-1 px-2 border text-sm min-w-[80px]">{item.PLANT || 'N/A'}</td>
                 <td className="py-1 px-2 border text-sm min-w-[100px]">{item.Plant_Validé || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[120px]">{item.Storage_Location || 'N/A'}</td>
+                <td className="py-1 px-2 border text-sm min-w-[120px]" style={{ whiteSpace: 'pre-wrap' }}>
+                    {item.Storage_Location || 'N/A'}
+                </td>
                 <td className="py-1 px-2 border text-sm min-w-[150px] whitespace-normal break-words">{item.Storage_location_Validé || 'N/A'}</td>
                 <td className="py-1 px-2 border text-sm min-w-[80px]">{item.local || 'N/A'}</td>
                 <td className="py-1 px-2 border text-sm min-w-[100px]">{item.BIN_SAP || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[250px] whitespace-normal break-words">{item.bins_with_qte_nx || 'N/A'}</td>
+                <td className="py-1 px-2 border text-sm min-w-[250px]" style={{ whiteSpace: 'pre-wrap' }}>
+                    {item.bins_with_qte_nx || 'N/A'}
+                </td>
             </tr>
         ));
     }, [data]);
@@ -193,19 +196,18 @@ const Rangement = () => {
                                     <th className="py-1 px-2 border min-w-[60px]">Devise</th>
                                     <th className="py-1 px-2 border min-w-[100px]">Date EM</th>
                                     <th className="py-1 px-2 border min-w-[100px]">Dernière Sortie</th>
-                                    <th className="py-1 px-2 border min-w-[150px]">Fichier</th>
                                     <th className="py-1 px-2 border min-w-[100px]">Marque</th>
                                     <th className="py-1 px-2 border min-w-[120px]">Oracle Item Code</th>
-                                    <th className="py-1 px-2 border min-w-[200px]">Description Migration</th>
+                                    <th className="py-1 px-2 border min-w-[200px] whitespace-normal break-words">Description Migration</th>
                                     <th className="py-1 px-2 border min-w-[100px]">Qté Validée SAP</th>
                                     <th className="py-1 px-2 border min-w-[100px]">SAP Material</th>
                                     <th className="py-1 px-2 border min-w-[80px]">Plant</th>
                                     <th className="py-1 px-2 border min-w-[100px]">Plant Validé</th>
                                     <th className="py-1 px-2 border min-w-[120px]">Storage Location</th>
-                                    <th className="py-1 px-2 border min-w-[150px]">Storage Location Validé</th>
+                                    <th className="py-1 px-2 border min-w-[150px] whitespace-normal break-words">Storage Location Validé</th>
                                     <th className="py-1 px-2 border min-w-[80px]">Local</th>
                                     <th className="py-1 px-2 border min-w-[100px]">BIN SAP</th>
-                                    <th className="py-1 px-2 border min-w-[250px]">Bins with QTE NX</th>
+                                    <th className="py-1 px-2 border min-w-[250px] whitespace-normal break-words">Bins with QTE NX</th>
                                 </tr>
                             </thead>
                             <tbody>

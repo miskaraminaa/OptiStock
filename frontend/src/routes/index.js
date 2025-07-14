@@ -9,6 +9,7 @@ const Leads = lazy(() => import('../pages/protected/Leads'));
 const Dimensions = lazy(() => import('../pages/protected/Dimensions'));
 const Controle = lazy(() => import('../pages/protected/Controle'));
 const Rangement = lazy(() => import('../pages/protected/Rangement'));
+const RangementLE = lazy(() => import('../pages/protected/RangementLE'));
 
 
 const routes = [
@@ -19,6 +20,10 @@ const routes = [
   {
     path: '/controle',
     component: Controle, // view rendered
+  },
+  {
+    path: '/rangementle',
+    component: RangementLE, // view rendered
   },
   {
     path: '/rangement',
