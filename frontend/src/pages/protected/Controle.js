@@ -22,7 +22,7 @@ const Controle = () => {
         type_sortie: "OT",
         nature_sortie: "normal",
         magasin: "Magasin",
-        articles: [], // Array of { article, designation_article, quantity }
+        articles: [], // Array of { article, designation_article, quantity, quantite_mise_a_jour }
     });
     const [mb51Articles, setMb51Articles] = useState([]); // Store articles from mb51
 
@@ -42,6 +42,17 @@ const Controle = () => {
         { header: "Préparateur", key: "preparateur" },
         { header: "Responsable local", key: "responsable_local" },
         { header: "Articles", key: "articles" },
+    ];
+
+    const STOCK_COLUMNS = [
+        { header: "Article", key: "article" },
+        { header: "Désignation", key: "designation_article" },
+        { header: "Stock Initial", key: "stock_initial" },
+        { header: "Sorties", key: "sorties" },
+        { header: "Entrées", key: "entrees" },
+        { header: "Quantité Contrôle", key: "stock_quantite_controle" },
+        { header: "Quantité IAM", key: "quantite_iam" },
+        { header: "Validation", key: "validation" },
     ];
 
     const TYPE_SORTIE_OPTIONS = [
@@ -64,7 +75,7 @@ const Controle = () => {
     ];
 
     const LOCAL_OPTIONS = {
-        "Magasin": [
+        Magasin: [
             { value: "MSLE", label: "MSLE/MSLT - BOUZIT LAHSSAN", responsable: "BOUZIT LAHSSAN" },
             { value: "MSLV", label: "MSLV/MSRL/MSGP/MSLL/MSPC/DSED - BENDADA MOHAMMED", responsable: "BENDADA MOHAMMED" },
         ],
@@ -77,28 +88,21 @@ const Controle = () => {
     };
 
     const RESPONSABLE_MAGASIN = {
-        "Magasin": "JAMAL RHENNAOUI",
+        Magasin: "JAMAL RHENNAOUI",
         "Magasin EPI": "ELBAHI AMINE",
         "Parc Exterieur": "SARGALI YOUSSEF",
     };
 
     const fetchMb51Articles = async () => {
         try {
-            const res = await fetch(`${BASE_URL}/controle/mb51/articles`);
-            console.log('Fetch response:', res.status, res.statusText);
+            const res = await fetch(`${BASE_URL}/controle/mb51/articles?magasin=${newItem.magasin || 'Magasin'}`);
             if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
             const articles = await res.json();
-            console.log('Fetched articles:', articles);
             setMb51Articles(articles);
         } catch (err) {
             setError(`Échec du chargement des articles : ${err.message}`);
         }
     };
-
-    useEffect(() => {
-        fetchData();
-        fetchMb51Articles();
-    }, [filters]);
 
     const fetchData = async () => {
         setIsLoadingData(true);
@@ -142,6 +146,11 @@ const Controle = () => {
         }
     };
 
+    useEffect(() => {
+        fetchData();
+        fetchMb51Articles();
+    }, [filters, newItem.magasin]);
+
     const applyFilters = (data) => {
         let filtered = [...data];
         if (filters.nOt) {
@@ -176,14 +185,22 @@ const Controle = () => {
         if (!newItem.articles.some(a => a.article === article)) {
             setNewItem(prev => ({
                 ...prev,
-                articles: [...prev.articles, { article, designation_article, quantity: 0 }],
+                articles: [...prev.articles, { article, designation_article, quantity: 0, quantite_mise_a_jour: 0 }],
             }));
         }
     };
 
     const updateQuantity = (index, value) => {
         const updatedArticles = [...newItem.articles];
-        updatedArticles[index].quantity = value || 0;
+        const quantity = parseFloat(value) || 0;
+        if (quantity < 0) return; // Prevent negative quantities
+        const mb51Article = mb51Articles.find(a => a.article === updatedArticles[index].article);
+        if (mb51Article && quantity > mb51Article.stock_quantite_controle) {
+            setError(`Quantité pour ${updatedArticles[index].article} dépasse la quantité contrôle (${mb51Article.stock_quantite_controle})`);
+            return;
+        }
+        updatedArticles[index].quantity = quantity;
+        updatedArticles[index].quantite_mise_a_jour = (mb51Article?.stock_quantite_controle || 0) - quantity;
         setNewItem(prev => ({
             ...prev,
             articles: updatedArticles,
@@ -202,9 +219,21 @@ const Controle = () => {
     const updateItems = async (action) => {
         try {
             if (action === "add" && newItem) {
+                // Validate articles
+                if (!newItem.articles || newItem.articles.length === 0) {
+                    throw new Error("Au moins un article doit être fourni.");
+                }
+                for (const article of newItem.articles) {
+                    if (!article.article || article.quantity <= 0) {
+                        throw new Error(`L'article ${article.article || 'inconnu'} doit avoir une quantité positive.`);
+                    }
+                    const mb51Article = mb51Articles.find(a => a.article === article.article);
+                    if (mb51Article && article.quantity > mb51Article.stock_quantite_controle) {
+                        throw new Error(`Quantité pour ${article.article} dépasse la quantité contrôle (${mb51Article.stock_quantite_controle}).`);
+                    }
+                }
+
                 const selectedLocal = LOCAL_OPTIONS[newItem.magasin]?.find(loc => loc.value === newItem.local);
-                console.log('New Item before validation:', newItem); // Debug log
-                // Validate and set default values
                 let n_ot = newItem.n_ot || '';
                 let bs = newItem.bs || '';
                 let le = newItem.le || '';
@@ -212,7 +241,6 @@ const Controle = () => {
 
                 if (newItem.type_sortie === "OT" && (!n_ot || n_ot.trim() === '')) {
                     n_ot = `OT${moment().format("YYYYMMDDHHmmss")}`;
-                    console.log('Generated n_ot:', n_ot); // Debug log
                 }
                 if (newItem.type_sortie === "BS" && (!bs || bs.trim() === '')) {
                     bs = `BS${moment().format("YYYYMMDDHHmmss")}`;
@@ -248,10 +276,10 @@ const Controle = () => {
                     articles: newItem.articles.map(a => ({
                         article: a.article,
                         designation_article: a.designation_article,
-                        quantity: a.quantity || 0,
+                        quantity: parseFloat(a.quantity) || 0,
+                        quantite_mise_a_jour: a.quantite_mise_a_jour || 0,
                     })),
                 };
-                console.log('Item to send:', itemToAdd); // Debug log
                 const res = await fetch(`${BASE_URL}/controle/update`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -294,9 +322,14 @@ const Controle = () => {
     };
 
     const exportToExcel = () => {
-        const ws = XLSX.utils.json_to_sheet(filteredData);
+        const livraisonsSheet = XLSX.utils.json_to_sheet(filteredData.map(row => ({
+            ...row,
+            articles: Array.isArray(row.articles) ? row.articles.map(a => `${a.article} (${a.quantity})`).join(', ') : '',
+        })));
+        const stockSheet = XLSX.utils.json_to_sheet(mb51Articles);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Controle Livraisons");
+        XLSX.utils.book_append_sheet(wb, livraisonsSheet, "Controle Livraisons");
+        XLSX.utils.book_append_sheet(wb, stockSheet, "Stock Control");
         XLSX.writeFile(wb, `controle_livraison_${moment().format("YYYYMMDD_HHmmss")}.xlsx`);
     };
 
@@ -309,17 +342,20 @@ const Controle = () => {
                     <style>
                         body { font-family: Arial, sans-serif; margin: 20px; color: #000; }
                         h1 { text-align: center; font-size: 24px; margin-bottom: 10px; }
+                        h2 { font-size: 18px; margin: 20px 0 10px; }
                         p { text-align: center; font-size: 14px; color: #555; margin-bottom: 20px; }
-                        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+                        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px; }
                         th, td { border: 1px solid #000; padding: 8px; text-align: left; }
                         th { background-color: #f0f0f0; font-weight: bold; text-transform: uppercase; }
                         tr:nth-child(even) { background-color: #f9f9f9; }
                         .no-data { text-align: center; padding: 20px; font-style: italic; }
+                        .validation-non-valide { color: red; font-weight: bold; }
                     </style>
                 </head>
                 <body>
                     <h1>Contrôle Livraison</h1>
                     <p>Imprimé le ${moment().format("DD/MM/YYYY HH:mm")}</p>
+                    <h2>Livraisons</h2>
                     <table>
                         <thead>
                             <tr>
@@ -328,15 +364,37 @@ const Controle = () => {
                         </thead>
                         <tbody>
                             ${filteredData.length === 0
-                ? '<tr><td colspan="' + COLUMNS.length + '" class="no-data">Aucune donnée disponible pour les filtres sélectionnés.</td></tr>'
+                ? `<tr><td colspan="${COLUMNS.length}" class="no-data">Aucune donnée disponible pour les filtres sélectionnés.</td></tr>`
                 : filteredData.map(row => `
-                                        <tr>
-                                            ${COLUMNS.map(col => `
-                                                <td>${col.key === 'articles' && row[col.key] ? (Array.isArray(row[col.key]) ? row[col.key].map(a => `${a.article} (${a.quantity})`).join(', ') : row[col.key]) : (row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : '')}</td>
-                                            `).join('')}
-                                        </tr>
-                                    `).join('')
-            }
+                                    <tr>
+                                        ${COLUMNS.map(col => `
+                                            <td>${col.key === 'articles' && row[col.key]
+                        ? (Array.isArray(row.articles) ? row.articles.map(a => `${a.article} (${a.quantity})`).join(', ') : '')
+                        : (row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : '')}</td>
+                                        `).join('')}
+                                    </tr>
+                                `).join('')}
+                        </tbody>
+                    </table>
+                    <h2>Stock Control</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                ${STOCK_COLUMNS.map(col => `<th>${col.header}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${mb51Articles.length === 0
+                ? `<tr><td colspan="${STOCK_COLUMNS.length}" class="no-data">Aucun article disponible.</td></tr>`
+                : mb51Articles.map(row => `
+                                    <tr>
+                                        ${STOCK_COLUMNS.map(col => `
+                                            <td class="${col.key === 'validation' && row[col.key] !== 'Validé' ? 'validation-non-valide' : ''}">
+                                                ${row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : ''}
+                                            </td>
+                                        `).join('')}
+                                    </tr>
+                                `).join('')}
                         </tbody>
                     </table>
                 </body>
@@ -507,17 +565,18 @@ const Controle = () => {
                             <select
                                 value={newItem.local}
                                 onChange={(e) => {
-                                    const selectedLocal = LOCAL_OPTIONS[newItem.magasin].find(loc => loc.value === e.target.value);
+                                    const selectedLocal = LOCAL_OPTIONS[newItem.magasin]?.find(loc => loc.value === e.target.value);
                                     setNewItem({
                                         ...newItem,
                                         local: e.target.value,
-                                        responsable_local: selectedLocal?.responsable || ""
+                                        responsable_local: selectedLocal?.responsable || "",
                                     });
                                 }}
                                 className="p-2 border rounded"
+                                disabled={!newItem.magasin}
                             >
                                 <option value="">Sélectionner un local</option>
-                                {newItem.magasin && LOCAL_OPTIONS[newItem.magasin].map((option) => (
+                                {newItem.magasin && LOCAL_OPTIONS[newItem.magasin]?.map((option) => (
                                     <option key={option.value} value={option.value}>
                                         {option.label}
                                     </option>
@@ -549,20 +608,21 @@ const Controle = () => {
                                 <select
                                     onChange={(e) => {
                                         const [article, designation_article] = e.target.value.split(" - ");
-                                        if (article && designation_article && !newItem.articles.some(a => a.article === article)) {
+                                        if (article && designation_article) {
                                             addArticle(article, designation_article);
                                         }
                                         e.target.value = ""; // Reset dropdown
                                     }}
                                     className="p-2 border rounded w-full mb-2"
+                                    disabled={mb51Articles.length === 0}
                                 >
                                     <option value="">Sélectionner un article</option>
-                                    {mb51Articles && mb51Articles.length > 0 ? (
+                                    {mb51Articles.length > 0 ? (
                                         [...new Set(mb51Articles.map(a => a.article))].map(article => {
                                             const designation = mb51Articles.find(a => a.article === article)?.designation_article;
                                             return (
                                                 <option key={article} value={`${article} - ${designation}`}>
-                                                    {article} - {designation}
+                                                    {article} - {designation} (Quantité Contrôle: {mb51Articles.find(a => a.article === article)?.stock_quantite_controle || 0})
                                                 </option>
                                             );
                                         })
@@ -577,36 +637,44 @@ const Controle = () => {
                                                 <tr className="bg-gray-100">
                                                     <th className="border p-2 text-left">Code</th>
                                                     <th className="border p-2 text-left">Désignation</th>
+                                                    <th className="border p-2 text-left">Quantité Contrôle</th>
                                                     <th className="border p-2 text-left">Quantité</th>
+                                                    <th className="border p-2 text-left">Quantité Mise à Jour</th>
                                                     <th className="border p-2 text-left">Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {newItem.articles.map((article, index) => (
-                                                    <tr key={article.article} className="hover:bg-gray-50">
-                                                        <td className="border p-2">{article.article}</td>
-                                                        <td className="border p-2">{article.designation_article}</td>
-                                                        <td className="border p-2">
-                                                            <input
-                                                                type="number"
-                                                                min="0"
-                                                                value={article.quantity}
-                                                                onChange={(e) => updateQuantity(index, e.target.value)}
-                                                                className="p-1 border rounded w-20"
-                                                                placeholder="Quantité"
-                                                            />
-                                                        </td>
-                                                        <td className="border p-2">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => removeArticle(index)}
-                                                                className="text-red-500 hover:text-red-700"
-                                                            >
-                                                                <TrashIcon className="h-5 w-5" />
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
+                                                {newItem.articles.map((article, index) => {
+                                                    const mb51Article = mb51Articles.find(a => a.article === article.article);
+                                                    return (
+                                                        <tr key={article.article} className="hover:bg-gray-50">
+                                                            <td className="border p-2">{article.article}</td>
+                                                            <td className="border p-2">{article.designation_article}</td>
+                                                            <td className="border p-2">{mb51Article?.stock_quantite_controle || 0}</td>
+                                                            <td className="border p-2">
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    step="1"
+                                                                    value={article.quantity}
+                                                                    onChange={(e) => updateQuantity(index, e.target.value)}
+                                                                    className="p-1 border rounded w-20"
+                                                                    placeholder="Quantité"
+                                                                />
+                                                            </td>
+                                                            <td className="border p-2">{article.quantite_mise_a_jour !== undefined ? article.quantite_mise_a_jour : 0}</td>
+                                                            <td className="border p-2">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => removeArticle(index)}
+                                                                    className="text-red-500 hover:text-red-700"
+                                                                >
+                                                                    <TrashIcon className="h-5 w-5" />
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
                                             </tbody>
                                         </table>
                                     </div>
@@ -616,14 +684,49 @@ const Controle = () => {
                             <button
                                 type="submit"
                                 className="col-span-2 bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
-                                disabled={isLoadingData}
+                                disabled={isLoadingData || newItem.articles.length === 0}
                             >
                                 Ajouter la livraison
                             </button>
                         </form>
                     </div>
                 )}
-                <div className="overflow-x-auto">
+                <div className="mt-4 overflow-x-auto">
+                    <h3 className="text-lg font-semibold mb-2">Stock Control</h3>
+                    <table className="w-full text-sm border-collapse">
+                        <thead>
+                            <tr className="bg-gray-100">
+                                {STOCK_COLUMNS.map(col => (
+                                    <th key={col.key} className="border p-2 text-left">{col.header}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {mb51Articles.length === 0 ? (
+                                <tr>
+                                    <td colSpan={STOCK_COLUMNS.length} className="border p-2 text-center text-gray-500">
+                                        Aucun article disponible.
+                                    </td>
+                                </tr>
+                            ) : (
+                                mb51Articles.map((row, index) => (
+                                    <tr key={index} className="hover:bg-gray-50">
+                                        {STOCK_COLUMNS.map(col => (
+                                            <td
+                                                key={col.key}
+                                                className={`border p-2 ${col.key === 'validation' && row[col.key] !== 'Validé' ? 'text-red-500 font-bold' : ''}`}
+                                            >
+                                                {row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : ''}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+                <div className="mt-4 overflow-x-auto">
+                    <h3 className="text-lg font-semibold mb-2">Livraisons</h3>
                     <table id="controle-table" className="w-full text-sm text-left text-gray-500">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                             <tr>
@@ -671,7 +774,9 @@ const Controle = () => {
                                         </td>
                                         {COLUMNS.map((col) => (
                                             <td key={col.key} className="px-4 py-2">
-                                                {col.key === 'articles' && row[col.key] ? (Array.isArray(row[col.key]) ? row[col.key].map(a => `${a.article} (${a.quantity})`).join(', ') : JSON.parse(row[col.key]).map(a => `${a.article} (${a.quantity})`).join(', ')) : (row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : '')}
+                                                {col.key === 'articles' && row[col.key]
+                                                    ? (Array.isArray(row[col.key]) ? row[col.key].map(a => `${a.article} (${a.quantity})`).join(', ') : '')
+                                                    : (row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : '')}
                                             </td>
                                         ))}
                                         <td className="px-4 py-2">

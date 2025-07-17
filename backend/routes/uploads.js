@@ -3,7 +3,6 @@ const router = express.Router();
 const db = require('../config/db');
 const multer = require('multer');
 const XLSX = require('xlsx');
-const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const path = require('path');
 const { excelDateToJSDate } = require('../utils/excelHelpers');
@@ -37,27 +36,6 @@ const upload = multer({
     },
 });
 
-// Middleware to verify JWT
-const authenticate = (req, res, next) => {
-    const authHeader = req.headers.authorization;
-    console.log('Auth Header:', authHeader);
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        console.log('Missing or malformed Authorization header');
-        return res.status(401).json({ message: 'Unauthorized: Missing or malformed token' });
-    }
-    const token = authHeader.split(' ')[1];
-    console.log('Token:', token);
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        console.log('Decoded Token:', decoded);
-        req.user = decoded;
-        next();
-    } catch (error) {
-        console.error('JWT Verification Error:', error.message);
-        return res.status(401).json({ message: `Invalid token: ${error.message}` });
-    }
-};
-
 // File type to table mapping
 const fileTypeToTable = {
     LE: 'le_status',
@@ -65,12 +43,11 @@ const fileTypeToTable = {
     LS: 'ls_status',
     LST: 'ls_tache',
     MB51: 'mb51',
-    MOUVEMENT: 'mouvement',
     STOCK_EWM: 'stock_ewm',
-    ETAT_DE_STOCK: 'etat_de_stock',
+    STOCK_IAM: 'stock_iam',
 };
 
-// Column mappings (keeping le_status as provided)
+// Column mappings (unchanged from your provided code)
 const columnMappings = {
     le_status: {
         "Bloqué (global)": "bloque_global",
@@ -127,7 +104,6 @@ const columnMappings = {
         "Créé le": "cree_le",
         "Créé(e) à": "cree_a",
         "Créé par": "cree_par",
-        // Additional mappings for problematic headers
         "avis de livraison": "avis_livraison",
         "statut transit": "statut_transit",
         "statut entrée de stock": "statut_entree_stock",
@@ -250,10 +226,10 @@ const columnMappings = {
     },
     ls_status: {
         "Bloqué (global)": "bloque_global",
-        "Bloque (global)": "bloque_global", // Handle alternate spelling
-        "Bloqué (global) ": "bloque_global", // Handle trailing space
+        "Bloque (global)": "bloque_global",
+        "Bloqué (global) ": "bloque_global",
         "Document": "Document",
-        "document": "Document", // Handle lowercase
+        "document": "Document",
         "Type de document": "type_document",
         "Description du type de document": "description_type_document",
         "Généré manuellement": "genere_manuellement",
@@ -310,11 +286,10 @@ const columnMappings = {
         "Statut sortie march. et répartition": "statut_sortie_marchandises_repartition",
         "Créé le": "cree_le",
         "Créé(e) à": "cree_a",
-        "Cree(e) a": "cree_a", // Handle alternate formatting
+        "Cree(e) a": "cree_a",
         "Numéro de séquence": "numero_sequence",
         "Pertinence des marchandises dangereuses": "pertinence_marchandises_dangereuses",
         "Créé par": "cree_par",
-        // Handle trailing spaces
         "Bloqué (global) ": "bloque_global",
         "Document ": "Document",
         "Nombre de postes ": "nombre_postes",
@@ -541,6 +516,23 @@ const columnMappings = {
         "Devise": "devise",
         "Date EM": "date_em",
         "Dernière Sortie": "derniere_sortie"
+    },
+    stock_iam: {
+        "Numéro d'article": "numero_article",
+        "Description d'article": "description_article",
+        "Division": "division",
+        "Nom de la division": "nom_division",
+        "Magasin": "magasin",
+        "Description du magasin": "description_magasin",
+        "Type de stock spécial": "type_stock_special",
+        "Stock à utilisation libre": "stock_utilisation_libre",
+        "Stock en contrôle qualité": "stock_controle_qualite",
+        "Stock bloqué": "stock_bloque",
+        "Date de reporting": "date_reporting",
+        "Valeur actuelle du stock à utilisation libre": "valeur_stock_utilisation_libre",
+        "Valeur actuelle du stock bloqué": "valeur_stock_bloque",
+        "Valeur du stock à utilisation libre": "valeur_stock_utilisation_libre",
+        "Valeur du stock bloqué": "valeur_stock_bloque"
     }
 };
 
@@ -554,10 +546,10 @@ const normalizeHeader = (header) => {
         return '';
     }
     const normalized = header
-        .normalize('NFD') // Decompose diacritics
-        .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
-        .replace(/[\s\u00A0]+/g, ' ') // Replace all whitespace (including non-breaking spaces) with single space
-        .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[\s\u00A0]+/g, ' ')
+        .replace(/[^a-zA-Z0-9\s]/g, '')
         .trim()
         .toLowerCase();
     console.log(`Header "${header}" normalized to "${normalized}", char codes:`,
@@ -580,14 +572,43 @@ const sanitizeValue = (value, columnType, columnName, tableName) => {
     }
 
     if (tableName === 'stock_ewm' && columnName === 'date_em' && typeof value === 'string') {
-        // Convertir la chaîne au format dd.MM.yyyy HH:mm:ss en date ISO
         const dateMatch = value.match(/^(\d{2})\.(\d{2})\.(\d{4}) (\d{2}):(\d{2}):(\d{2})$/);
         if (dateMatch) {
             const [, day, month, year, hour, minute, second] = dateMatch;
             const date = new Date(`${year}-${month}-${day} ${hour}:${minute}:${second}`);
-            return date.toISOString().split('T')[0]; // Retourne yyyy-MM-dd
+            return date.toISOString().split('T')[0];
         }
         console.warn(`Invalid date format for ${columnName} value ${value}`);
+        return null;
+    }
+
+    if (tableName === 'stock_iam' && columnName === 'date_reporting') {
+        if (typeof value === 'number') {
+            try {
+                const date = excelDateToJSDate(value);
+                return date.toISOString().split('T')[0];
+            } catch (error) {
+                console.warn(`Date conversion failed for ${columnName} value ${value}:`, error.message);
+                return null;
+            }
+        } else if (typeof value === 'string') {
+            const formats = ['%d/%m/%Y', '%Y-%m-%d'];
+            for (const format of formats) {
+                const dateMatch = value.match(/^\d{2}\/\d{2}\/\d{4}$/) || value.match(/^\d{4}-\d{2}-\d{2}$/);
+                if (dateMatch) {
+                    try {
+                        const date = new Date(value);
+                        if (!isNaN(date.getTime())) {
+                            return date.toISOString().split('T')[0];
+                        }
+                    } catch (error) {
+                        console.warn(`Invalid date format for ${columnName} value ${value} with format ${format}`);
+                    }
+                }
+            }
+            console.warn(`Invalid date format for ${columnName} value ${value}`);
+            return null;
+        }
         return null;
     }
 
@@ -601,7 +622,6 @@ const sanitizeValue = (value, columnType, columnName, tableName) => {
         }
     }
 
-    // Autres cas existants (time, tinyint, int, etc.)
     if (columnType.includes('time') && typeof value === 'string') {
         const timeMatch = value.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(AM|PM))?$/i);
         if (timeMatch) {
@@ -645,7 +665,7 @@ const sanitizeValue = (value, columnType, columnName, tableName) => {
 };
 
 // GET route
-router.get('/', authenticate, async (req, res) => {
+router.get('/', async (req, res) => {
     console.log('Starting GET /uploads');
     try {
         const stats = {
@@ -665,7 +685,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // POST route
-router.post('/', authenticate, upload.single('file'), async (req, res) => {
+router.post('/', upload.single('file'), async (req, res) => {
     console.log('Starting POST /uploads:', { file: req.file?.originalname, type: req.body.type, mimetype: req.file?.mimetype });
     try {
         const file = req.file;
@@ -765,7 +785,6 @@ router.post('/', authenticate, upload.single('file'), async (req, res) => {
             console.log(`No name_file column in ${tableName}; skipping duplicate check`);
         }
 
-        // Create case-insensitive mapping with enhanced logging
         const caseInsensitiveMapping = {};
         const validColumnMapping = {};
         const missingColumns = [];
@@ -854,7 +873,6 @@ router.post('/', authenticate, upload.single('file'), async (req, res) => {
                     continue;
                 }
 
-                // Cleaning for le_tache: Skip rows with NULL or empty Produit
                 if (tableName === 'le_tache') {
                     const produitValue = mappedData.Produit;
                     const trimmedProduit = typeof produitValue === 'string' ? produitValue.trim() : produitValue;
@@ -872,7 +890,7 @@ router.post('/', authenticate, upload.single('file'), async (req, res) => {
                         });
                         continue;
                     }
-                    mappedData.Produit = trimmedProduit; // Ensure trimmed value is used
+                    mappedData.Produit = trimmedProduit;
                 }
                 if (validMetadataColumns.includes('name_file') && !mappedData.name_file) {
                     mappedData.name_file = fileName;
@@ -930,19 +948,30 @@ router.post('/', authenticate, upload.single('file'), async (req, res) => {
             }
         }
 
-        // Insert file metadata into imported_file table
         console.log('Inserting file metadata into imported_file');
         const importStatus = failureData.length === 0 ? 'imported' : processedCount === 0 ? 'failed' : 'partial';
         try {
+            if (!fileTypeToTable[type]) {
+                console.error('Invalid type during imported_file insertion:', type);
+                throw new Error('Invalid file type for imported_file insertion');
+            }
             const importSql = `
-                INSERT INTO imported_file (fichier_name, type, status)
-                VALUES (?, ?, ?)
+                INSERT INTO imported_file (fichier_name, type, status, import_date)
+                VALUES (?, ?, ?, NOW())
             `;
             const importValues = [fileName, type, importStatus];
+            console.log('Executing imported_file insert:', { fileName, type, importStatus });
             const [importResult] = await db.query(importSql, importValues);
             console.log(`Inserted file metadata: ID ${importResult.insertId}`);
         } catch (importError) {
             console.error('Error inserting into imported_file:', importError);
+            await db.query('ROLLBACK');
+            return res.status(500).json({
+                message: 'Failed to insert file metadata into imported_file',
+                error: importError.message,
+                code: importError.code,
+                sql: importError.sql
+            });
         }
 
         console.log('Building response');
@@ -984,41 +1013,35 @@ router.post('/', authenticate, upload.single('file'), async (req, res) => {
     }
 });
 
-// Test normalize endpoint
-router.post('/test-normalize', authenticate, async (req, res) => {
-    console.log('Starting POST /uploads/test-normalize');
+// GET route to list all imported files
+router.get('/files', async (req, res) => {
+    console.log('Starting GET /uploads/files');
     try {
-        const { header, table } = req.body;
-        if (!header || !table) {
-            return res.status(400).json({ message: 'Missing header or table parameter' });
-        }
-        const columnMapping = columnMappings[table] || {};
-        const caseInsensitiveMapping = {};
-        for (const [excelCol, dbCol] of Object.entries(columnMapping)) {
-            caseInsensitiveMapping[normalizeHeader(excelCol)] = dbCol;
-        }
-        const normalized = normalizeHeader(header);
-        const dbColumn = caseInsensitiveMapping[normalized] || 'No mapping found';
+        const [rows] = await db.query(`
+            SELECT id, fichier_name, type, import_date, status
+            FROM imported_file
+            ORDER BY import_date DESC
+        `);
+        console.log(`Retrieved ${rows.length} imported files`);
         return res.status(200).json({
-            rawHeader: header,
-            normalizedHeader: normalized,
-            mappedColumn: dbColumn
+            message: 'Imported files retrieved successfully',
+            files: rows
         });
     } catch (err) {
-        console.error('Test normalize error:', err);
+        console.error('GET /uploads/files error:', err);
         return res.status(500).json({
-            message: 'Test normalize failed',
-            error: err.message
+            message: 'Error retrieving imported files',
+            error: err.message,
+            code: err.code,
+            sql: err.sql
         });
     }
 });
 
-
 // POST route pour exporter stock_ewm vers Excel
-router.post('/export/stock_ewm', authenticate, async (req, res) => {
+router.post('/export/stock_ewm', async (req, res) => {
     console.log('Starting POST /uploads/export/stock_ewm');
     try {
-        // Récupérer les données de stock_ewm
         const [rows] = await db.query('SELECT * FROM stock_ewm');
 
         if (!rows || rows.length === 0) {
@@ -1026,7 +1049,6 @@ router.post('/export/stock_ewm', authenticate, async (req, res) => {
             return res.status(404).json({ message: 'No data found in stock_ewm' });
         }
 
-        // Préparer les données pour Excel
         const data = rows.map(row => ({
             Article: row.article,
             "Désignation Article": row.designation_article,
@@ -1047,20 +1069,17 @@ router.post('/export/stock_ewm', authenticate, async (req, res) => {
                 day: '2-digit',
                 month: '2-digit',
                 year: 'numeric'
-            }) : null, // Format dd/MM/yyyy pour Excel
+            }) : null,
             "Dernière Sortie": row.derniere_sortie
         }));
 
-        // Créer un workbook
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.json_to_sheet(data);
         XLSX.utils.book_append_sheet(wb, ws, 'Stock_EWM');
 
-        // Générer le fichier Excel
         const fileName = `stock_ewm_export_${new Date().toISOString().split('T')[0]}.xlsx`;
         const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 
-        // Envoyer le fichier comme réponse
         res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         console.log(`Exporting file: ${fileName}`);
@@ -1070,32 +1089,6 @@ router.post('/export/stock_ewm', authenticate, async (req, res) => {
         console.error('Error in POST /uploads/export/stock_ewm:', err);
         return res.status(500).json({
             message: 'Server error during export',
-            error: err.message,
-            code: err.code,
-            sql: err.sql
-        });
-    }
-});
-// Test insert endpoint
-router.post('/test-insert', authenticate, async (req, res) => {
-    console.log('Starting POST /uploads/test-insert');
-    try {
-        const testData = {
-            Tache_magasin: 'TEST001',
-            Produit: 'PROD001',
-            Date_creation: '2025-06-17'
-        };
-        const columns = Object.keys(testData);
-        const placeholders = columns.map(() => '?').join(', ');
-        const columnNames = columns.map(col => `\`${col}\``).join(', ');
-        const sql = `INSERT INTO le_tache (${columnNames}) VALUES (${placeholders})`;
-        const values = Object.values(testData);
-        const [result] = await db.query(sql, values);
-        return res.status(200).json({ message: 'Test insert successful', id: result.insertId });
-    } catch (err) {
-        console.error('Test insert error:', err);
-        return res.status(500).json({
-            message: 'Test insert failed',
             error: err.message,
             code: err.code,
             sql: err.sql

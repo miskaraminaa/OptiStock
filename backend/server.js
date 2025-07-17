@@ -1,5 +1,5 @@
 const express = require('express');
-const cors = require('cors'); 
+const cors = require('cors');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
@@ -8,7 +8,7 @@ const explorationRouter = require('./routes/exploration');
 const chartsRouter = require('./routes/charts');
 const controleRouter = require('./routes/controle');
 const rangementRouter = require('./routes/rangement');
-
+const rangementLeRouter = require('./routes/rangementle');
 
 let livraisonRouter;
 let uploadRouter;
@@ -28,13 +28,13 @@ try {
     console.error('Échec du chargement du routeur livraison :', err.message, err.stack);
     process.exit(1);
 }
-
 try {
     uploadRouter = require('./routes/uploads');
     console.log('Routeur uploads chargé avec succès');
 } catch (err) {
     console.warn('Routeur uploads non trouvé, ignoré :', err.message);
 }
+
 
 const app = express();
 
@@ -50,19 +50,19 @@ app.use((req, res, next) => {
     next();
 });
 
-
-app.use('/auth', authRoutes); // Supprimez /register redondant
+// Routes
+app.use('/auth', authRoutes);
 if (uploadRouter) {
     app.use('/uploads', uploadRouter);
 }
 app.use('/livraison', livraisonRouter);
 app.use('/dimensions', dimensionsRouter);
 app.use('/explorer', explorationRouter);
-
 app.use('/charts', chartsRouter);
 app.use('/rotation', rotaRouter);
 app.use('/controle', controleRouter);
 app.use('/rangement', rangementRouter);
+app.use('/rangement-le', rangementLeRouter);
 
 // Route de test DB
 app.get('/test-db', async (req, res) => {
