@@ -1,28 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 
-const authenticateToken = (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token) {
-        console.error(`[${new Date().toISOString()}] No token provided`);
-        return res.set('X-Redirect-Login', '/login').status(401).json({ message: 'No token provided' });
-    }
-
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
-        req.user = decoded;
-        next();
-    } catch (err) {
-        console.error(`[${new Date().toISOString()}] Token verification failed:`, err.message);
-        return res.set('X-Redirect-Login', '/login').status(403).json({ message: 'Invalid or expired token' });
-    }
-};
-
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 50;
@@ -49,7 +29,6 @@ router.get('/', authenticateToken, async (req, res) => {
                 s.derniere_sortie,
                 s.uploaded_at,
                 s.name_file
-                
             FROM stock_ewm s
             LEFT JOIN le_tache lt ON s.article = lt.Produit
             LEFT JOIN le_status ls ON lt.Document = ls.Document
@@ -88,7 +67,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Test endpoint to verify the fix
-router.get('/test-columns', authenticateToken, async (req, res) => {
+router.get('/test-columns', async (req, res) => {
     try {
         // Test the corrected column names
         const testQuery = `

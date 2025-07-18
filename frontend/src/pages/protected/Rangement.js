@@ -1,223 +1,356 @@
-import React, { useState, useEffect, Component, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useDispatch } from 'react-redux';
 import axios from 'axios';
 import debounce from 'lodash/debounce';
+import { FaSearch, FaRedo, FaWarehouse, FaChevronLeft, FaChevronRight, FaBoxes } from 'react-icons/fa';
+import { ClipLoader } from 'react-spinners';
+import { setPageTitle } from '../../features/common/headerSlice';
 
-// Error Boundary Component
-class ErrorBoundary extends Component {
-    state = { hasError: false };
-
-    static getDerivedStateFromError(error) {
-        return { hasError: true };
-    }
-
-    componentDidCatch(error, errorInfo) {
-        console.error('ErrorBoundary caught an error:', error, errorInfo);
-    }
-
-    render() {
-        if (this.state.hasError) {
-            return (
-                <div className="text-center text-red-500 p-4">
-                    <h2>Une erreur est survenue.</h2>
-                    <p>Veuillez réessayer plus tard ou contactez le support.</p>
-                </div>
-            );
-        }
-        return this.props.children;
-    }
-}
+// Centralized data validation
+const validateRangementData = (data) =>
+    data.map((item) => ({
+        article_code: item.article_code || 'N/A',
+        description: item.description || 'N/A',
+        numero_magasin: item.numero_magasin || 'N/A',
+        division: item.division || 'N/A',
+        warehouse: item.warehouse || 'N/A',
+        bin_location: item.bin_location || 'N/A',
+        type_magasin: item.type_magasin || 'N/A',
+        quantity: item.quantity != null ? Number(item.quantity) : 'N/A',
+        unit: item.unit || 'N/A',
+        type_stock: item.type_stock || 'N/A',
+        designation_type_stock: item.designation_type_stock || 'N/A',
+        groupe_valorisation: item.groupe_valorisation || 'N/A',
+        pmp: item.pmp != null ? Number(item.pmp) : 'N/A',
+        valeur_stock: item.valeur_stock != null ? Number(item.valeur_stock) : 'N/A',
+        devise: item.devise || 'N/A',
+        date_em: item.date_em || 'N/A',
+        derniere_sortie: item.derniere_sortie || 'N/A',
+        Marque: item.Marque || 'N/A',
+        Oracle_item_code: item.Oracle_item_code || 'N/A',
+        migration_description: item.migration_description || 'N/A',
+        Qté_validée_SAP: item.Qté_validée_SAP != null ? Number(item.Qté_validée_SAP) : 'N/A',
+        SAP_Material: item.SAP_Material || 'N/A',
+        PLANT: item.PLANT || 'N/A',
+        Plant_Validé: item.Plant_Validé || 'N/A',
+        Storage_Location: item.Storage_Location || 'N/A',
+        Storage_location_Validé: item.Storage_location_Validé || 'N/A',
+        local: item.local || 'N/A',
+        BIN_SAP: item.BIN_SAP || 'N/A',
+        bins_with_qte_nx: item.bins_with_qte_nx || 'N/A',
+    }));
 
 const Rangement = () => {
+    const dispatch = useDispatch();
     const [data, setData] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
+    const [totalRecords, setTotalRecords] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
+    const limit = 25; // Consistent with Rotations
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-    // Debounced fetch function to limit API calls
-    const fetchData = debounce(async (search, page) => {
+    useEffect(() => {
+        dispatch(setPageTitle({ title: 'Guide de Rangement' }));
+    }, [dispatch]);
+
+    const fetchData = async (page, search) => {
         try {
             setLoading(true);
-            const response = await axios.get('http://localhost:5000/rangement', {
-                params: { search, page }
+            setError(null);
+            const response = await axios.get(`${API_URL}/rangement`, {
+                params: { page, limit, search: search || undefined },
             });
-            // Ensure data is an array
             const responseData = Array.isArray(response.data.data) ? response.data.data : [];
-            setData(responseData);
-            setTotalPages(response.data.totalPages || 1);
+            setData(validateRangementData(responseData));
+            setTotalRecords(response.data.totalRecords || responseData.length);
+            setTotalPages(response.data.totalPages || Math.ceil(response.data.totalRecords / limit));
         } catch (err) {
-            setError(`Échec du chargement des données : ${err.message}`);
-            console.error('Fetch error:', err.response?.data || err.message);
+            setError(`Erreur lors du chargement des données : ${err.message}`);
         } finally {
             setLoading(false);
         }
-    }, 300);
+    };
 
-    // Trigger fetch on searchTerm or currentPage change
+    const debouncedFetchData = useMemo(() => debounce(fetchData, 300), []);
+
     useEffect(() => {
-        fetchData(searchTerm, currentPage);
-        return () => fetchData.cancel();
-    }, [searchTerm, currentPage]);
+        debouncedFetchData(currentPage, searchTerm);
+        return () => debouncedFetchData.cancel();
+    }, [currentPage, searchTerm, debouncedFetchData]);
 
-    // Handle page navigation
-    const handleNextPage = () => {
-        if (currentPage < totalPages) {
-            setCurrentPage(currentPage + 1);
-        }
+    const handleSearch = (e) => {
+        setSearchTerm(e.target.value.trim());
+        setCurrentPage(1);
     };
 
-    const handlePrevPage = () => {
-        if (currentPage > 1) {
-            setCurrentPage(currentPage - 1);
-        }
+    const handleRetry = () => {
+        setError(null);
+        setCurrentPage(1);
+        fetchData(currentPage, searchTerm);
     };
 
-    // Memoize table rows to prevent unnecessary re-renders
-    const tableRows = useMemo(() => {
-        if (!Array.isArray(data) || data.length === 0) {
-            return (
-                <tr>
-                    <td colSpan={29} className="py-1 px-2 border text-center text-gray-500 text-sm">
-                        Aucune donnée disponible
-                    </td>
-                </tr>
-            );
-        }
+    const handleSort = (key) => {
+        let direction = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+        setSortConfig({ key, direction });
+    };
 
-        return data.map((item, index) => (
-            <tr key={item.article_code || `item-${index}`} className="hover:bg-gray-100">
-                <td className="py-1 px-2 border text-sm min-w-[100px]">{item.article_code || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[200px] whitespace-normal break-words">{item.description || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[100px]">{item.numero_magasin || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[80px]">{item.division || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[80px]">{item.warehouse || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[120px]">{item.bin_location || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[80px]">{item.type_magasin || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[100px]">
-                    {item.quantity != null ? (
-                        <>
-                            {Number(item.quantity).toFixed(3)}
-                            {item.quantity < 0 && <span className="text-red-500"> (Sortie)</span>}
-                        </>
-                    ) : 'N/A'}
-                </td>
-                <td className="py-1 px-2 border text-sm min-w-[60px]">{item.unit || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[80px]">{item.type_stock || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[150px] whitespace-normal break-words">{item.designation_type_stock || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[120px]">{item.groupe_valorisation || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[80px]">{item.pmp != null ? Number(item.pmp).toFixed(2) : 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[100px]">{item.valeur_stock != null ? Number(item.valeur_stock).toFixed(2) : 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[60px]">{item.devise || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[100px]">{item.date_em || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[100px]">{item.derniere_sortie || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[100px]">{item.Marque || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[120px]">{item.Oracle_item_code || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[200px] whitespace-normal break-words">{item.migration_description || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[100px]">{item.Qté_validée_SAP != null ? Number(item.Qté_validée_SAP).toFixed(3) : 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[100px]">{item.SAP_Material || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[80px]">{item.PLANT || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[100px]">{item.Plant_Validé || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[120px]" style={{ whiteSpace: 'pre-wrap' }}>
-                    {item.Storage_Location || 'N/A'}
-                </td>
-                <td className="py-1 px-2 border text-sm min-w-[150px] whitespace-normal break-words">{item.Storage_location_Validé || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[80px]">{item.local || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[100px]">{item.BIN_SAP || 'N/A'}</td>
-                <td className="py-1 px-2 border text-sm min-w-[250px]" style={{ whiteSpace: 'pre-wrap' }}>
-                    {item.bins_with_qte_nx || 'N/A'}
-                </td>
-            </tr>
-        ));
-    }, [data]);
+    const sortedData = useMemo(() => {
+        if (!sortConfig.key) return [...data];
+        return [...data].sort((a, b) => {
+            const aValue = a[sortConfig.key] === 'N/A' ? '' : a[sortConfig.key];
+            const bValue = b[sortConfig.key] === 'N/A' ? '' : b[sortConfig.key];
+            if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }, [data, sortConfig]);
+
+    const getPageNumbers = () => {
+        const pages = [];
+        const maxVisiblePages = 5;
+        if (totalPages <= maxVisiblePages) {
+            for (let i = 1; i <= totalPages; i++) pages.push(i);
+        } else {
+            const startPage = Math.max(1, currentPage - 2);
+            const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+            if (startPage > 1) {
+                pages.push(1);
+                if (startPage > 2) pages.push('...');
+            }
+            for (let i = startPage; i <= endPage; i++) pages.push(i);
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) pages.push('...');
+                pages.push(totalPages);
+            }
+        }
+        return pages;
+    };
 
     return (
-        <ErrorBoundary>
-            <div className="container mx-auto p-4">
-                <h1 className="text-xl font-bold mb-4">Guide de Rangement</h1>
+        <div className="mx-auto max-w-7xl p-4 sm:p-6">
+            <div className="mb-6">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2 flex items-center">
+                    <FaWarehouse className="mr-3 text-blue-600" />
+                    Guide de Rangement
+                </h1>
+                <p className="text-gray-600 text-sm sm:text-base">
+                    Gestion des emplacements et suivi des stocks
+                </p>
+            </div>
 
-                {/* Search Input */}
-                <div className="mb-4">
+            <div className="mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                <div className="relative w-full sm:flex-1 max-w-md">
+                    <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
                     <input
                         type="text"
                         placeholder="Rechercher par code article, désignation ou marque"
-                        className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         value={searchTerm}
-                        onChange={(e) => {
-                            setSearchTerm(e.target.value);
-                            setCurrentPage(1);
-                        }}
+                        onChange={handleSearch}
+                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 text-sm"
+                        aria-label="Rechercher par code article, désignation ou marque"
                     />
                 </div>
-
-                {/* Pagination Controls */}
-                <div className="flex justify-between mb-4">
-                    <button
-                        onClick={handlePrevPage}
-                        disabled={currentPage === 1}
-                        className="px-4 py-2 bg-blue-500 text-white rounded disabled:bg-gray-300 text-sm"
-                    >
-                        Précédent
-                    </button>
-                    <span className="text-sm">Page {currentPage} sur {totalPages}</span>
-                    <button
-                        onClick={handleNextPage}
-                        disabled={currentPage === totalPages}
-                        className="px-4 py-2 bg-blue-500 text-white rounded disabled:bg-gray-300 text-sm"
-                    >
-                        Suivant
-                    </button>
+                <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <span className="flex items-center">
+                        <FaBoxes className="mr-1" />
+                        {totalRecords.toLocaleString()} articles
+                    </span>
+                    <span className="text-gray-400">Page {currentPage} / {totalPages}</span>
                 </div>
+            </div>
 
-                {/* Loading and Error States */}
-                {loading && <p className="text-center text-sm">Chargement...</p>}
-                {error && <p className="text-center text-red-500 text-sm">{error}</p>}
+            {loading && (
+                <div className="flex flex-col justify-center items-center my-8">
+                    <ClipLoader color="#3b82f6" size={40} />
+                    <p className="mt-4 text-gray-600">Chargement des données...</p>
+                    <p className="mt-2 text-sm text-gray-500">
+                        Page {currentPage} sur {totalPages} - {limit} articles par page
+                    </p>
+                </div>
+            )}
 
-                {/* Table */}
-                {!loading && !error && (
+            {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                            <div className="text-red-600 mr-3">⚠️</div>
+                            <span className="text-red-800 text-sm sm:text-base">{error}</span>
+                        </div>
+                        <button
+                            onClick={handleRetry}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition duration-200 flex items-center text-sm"
+                            aria-label="Réessayer le chargement des données"
+                        >
+                            <FaRedo className="mr-2" /> Réessayer
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {!loading && !error && sortedData.length === 0 && (
+                <div className="text-center py-12">
+                    <FaBoxes className="mx-auto text-gray-300 text-5xl mb-4" />
+                    <p className="text-gray-500 text-lg">Aucune donnée disponible</p>
+                    <p className="text-gray-400 text-sm mt-2">
+                        Vérifiez la configuration des données ou essayez une autre recherche
+                    </p>
+                </div>
+            )}
+
+            {!loading && !error && sortedData.length > 0 && (
+                <div className="bg-white rounded-lg shadow-lg overflow-hidden">
                     <div className="overflow-x-auto">
-                        <table className="min-w-full bg-white border text-sm">
-                            <thead>
-                                <tr className="bg-gray-200">
-                                    <th className="py-1 px-2 border min-w-[100px]">Code Article</th>
-                                    <th className="py-1 px-2 border min-w-[200px]">Désignation</th>
-                                    <th className="py-1 px-2 border min-w-[100px]">Numéro Magasin</th>
-                                    <th className="py-1 px-2 border min-w-[80px]">Division</th>
-                                    <th className="py-1 px-2 border min-w-[80px]">Magasin</th>
-                                    <th className="py-1 px-2 border min-w-[120px]">Emplacement</th>
-                                    <th className="py-1 px-2 border min-w-[80px]">Type Magasin</th>
-                                    <th className="py-1 px-2 border min-w-[100px]">Quantité</th>
-                                    <th className="py-1 px-2 border min-w-[60px]">Unité</th>
-                                    <th className="py-1 px-2 border min-w-[80px]">Type Stock</th>
-                                    <th className="py-1 px-2 border min-w-[150px]">Désignation Type Stock</th>
-                                    <th className="py-1 px-2 border min-w-[120px]">Groupe Valorisation</th>
-                                    <th className="py-1 px-2 border min-w-[80px]">PMP</th>
-                                    <th className="py-1 px-2 border min-w-[100px]">Valeur Stock</th>
-                                    <th className="py-1 px-2 border min-w-[60px]">Devise</th>
-                                    <th className="py-1 px-2 border min-w-[100px]">Date EM</th>
-                                    <th className="py-1 px-2 border min-w-[100px]">Dernière Sortie</th>
-                                    <th className="py-1 px-2 border min-w-[100px]">Marque</th>
-                                    <th className="py-1 px-2 border min-w-[120px]">Oracle Item Code</th>
-                                    <th className="py-1 px-2 border min-w-[200px] whitespace-normal break-words">Description Migration</th>
-                                    <th className="py-1 px-2 border min-w-[100px]">Qté Validée SAP</th>
-                                    <th className="py-1 px-2 border min-w-[100px]">SAP Material</th>
-                                    <th className="py-1 px-2 border min-w-[80px]">Plant</th>
-                                    <th className="py-1 px-2 border min-w-[100px]">Plant Validé</th>
-                                    <th className="py-1 px-2 border min-w-[120px]">Storage Location</th>
-                                    <th className="py-1 px-2 border min-w-[150px] whitespace-normal break-words">Storage Location Validé</th>
-                                    <th className="py-1 px-2 border min-w-[80px]">Local</th>
-                                    <th className="py-1 px-2 border min-w-[100px]">BIN SAP</th>
-                                    <th className="py-1 px-2 border min-w-[250px] whitespace-normal break-words">Bins with QTE NX</th>
+                        <table className="min-w-full border-collapse">
+                            <thead className="bg-gray-50">
+                                <tr className="text-gray-700 text-sm">
+                                    {[
+                                        { key: 'article_code', label: 'Code Article' },
+                                        { key: 'description', label: 'Désignation' },
+                                        { key: 'numero_magasin', label: 'Numéro Magasin' },
+                                        { key: 'division', label: 'Division' },
+                                        { key: 'warehouse', label: 'Magasin' },
+                                        { key: 'bin_location', label: 'Emplacement' },
+                                        { key: 'type_magasin', label: 'Type Magasin' },
+                                        { key: 'quantity', label: 'Quantité' },
+                                        { key: 'unit', label: 'Unité' },
+                                        { key: 'type_stock', label: 'Type Stock' },
+                                        { key: 'designation_type_stock', label: 'Désignation Type Stock' },
+                                        { key: 'groupe_valorisation', label: 'Groupe Valorisation' },
+                                        { key: 'pmp', label: 'PMP' },
+                                        { key: 'valeur_stock', label: 'Valeur Stock' },
+                                        { key: 'devise', label: 'Devise' },
+                                        { key: 'date_em', label: 'Date EM' },
+                                        { key: 'derniere_sortie', label: 'Dernière Sortie' },
+                                        { key: 'Marque', label: 'Marque' },
+                                        { key: 'Oracle_item_code', label: 'Oracle Item Code' },
+                                        { key: 'migration_description', label: 'Description Migration' },
+                                        { key: 'Qté_validée_SAP', label: 'Qté Validée SAP' },
+                                        { key: 'SAP_Material', label: 'SAP Material' },
+                                        { key: 'PLANT', label: 'Plant' },
+                                        { key: 'Plant_Validé', label: 'Plant Validé' },
+                                        { key: 'Storage_Location', label: 'Storage Location' },
+                                        { key: 'Storage_location_Validé', label: 'Storage Location Validé' },
+                                        { key: 'local', label: 'Local' },
+                                        { key: 'BIN_SAP', label: 'BIN SAP' },
+                                        { key: 'bins_with_qte_nx', label: 'Bins with QTE NX' },
+                                    ].map(({ key, label }) => (
+                                        <th
+                                            key={key}
+                                            className="px-4 py-3 border-b font-semibold text-left cursor-pointer"
+                                            onClick={() => handleSort(key)}
+                                            role="button"
+                                            aria-sort={sortConfig.key === key ? sortConfig.direction : 'none'}
+                                            scope="col"
+                                        >
+                                            {label} {sortConfig.key === key && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                    ))}
                                 </tr>
                             </thead>
-                            <tbody>
-                                {tableRows}
+                            <tbody className="divide-y divide-gray-200">
+                                {sortedData.map((item, index) => (
+                                    <tr key={`${item.article_code}-${index}`} className="hover:bg-gray-50 transition duration-150">
+                                        <td className="px-4 py-3 text-gray-900 font-medium text-sm">{item.article_code}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm max-w-[16rem]">
+                                            <div className="truncate" title={item.description}>{item.description}</div>
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.numero_magasin}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.division}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.warehouse}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.bin_location}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.type_magasin}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm font-medium">
+                                            {item.quantity !== 'N/A' ? (
+                                                <>
+                                                    {item.quantity.toFixed(3)}
+                                                    {item.quantity < 0 && <span className="text-red-500"> (Sortie)</span>}
+                                                </>
+                                            ) : 'N/A'}
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.unit}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.type_stock}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm max-w-[12rem]">
+                                            <div className="truncate" title={item.designation_type_stock}>{item.designation_type_stock}</div>
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.groupe_valorisation}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.pmp === 'N/A' ? 'N/A' : item.pmp.toFixed(2)}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.valeur_stock === 'N/A' ? 'N/A' : item.valeur_stock.toFixed(2)}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.devise}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.date_em}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.derniere_sortie}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.Marque}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.Oracle_item_code}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm max-w-[16rem]">
+                                            <div className="truncate" title={item.migration_description}>{item.migration_description}</div>
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.Qté_validée_SAP === 'N/A' ? 'N/A' : item.Qté_validée_SAP.toFixed(3)}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.SAP_Material}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.PLANT}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.Plant_Validé}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.Storage_Location}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm max-w-[12rem]">
+                                            <div className="truncate" title={item.Storage_location_Validé}>{item.Storage_location_Validé}</div>
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.local}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.BIN_SAP}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm max-w-[16rem] whitespace-pre-wrap">{item.bins_with_qte_nx}</td>
+                                    </tr>
+                                ))}
                             </tbody>
                         </table>
                     </div>
-                )}
-            </div>
-        </ErrorBoundary>
+                </div>
+            )}
+
+            {totalPages > 1 && (
+                <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
+                    <button
+                        onClick={() => setCurrentPage(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-700 transition duration-200 flex items-center text-sm sm:text-base"
+                        aria-label="Page précédente"
+                    >
+                        <FaChevronLeft className="mr-2" /> Précédent
+                    </button>
+                    <div className="flex items-center gap-2 overflow-x-auto">
+                        {getPageNumbers().map((pageNum, index) => (
+                            <button
+                                key={index}
+                                onClick={() => typeof pageNum === 'number' && setCurrentPage(pageNum)}
+                                disabled={pageNum === '...' || pageNum === currentPage}
+                                className={`px-3 py-1 rounded-md text-sm transition duration-200 ${pageNum === currentPage
+                                        ? 'bg-blue-600 text-white'
+                                        : pageNum === '...' ? 'text-gray-400 cursor-default' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                    }`}
+                                aria-label={pageNum === '...' ? 'Ellipsis' : `Page ${pageNum}`}
+                                aria-current={pageNum === currentPage ? 'page' : undefined}
+                            >
+                                {pageNum}
+                            </button>
+                        ))}
+                    </div>
+                    <button
+                        onClick={() => setCurrentPage(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-700 transition duration-200 flex items-center text-sm sm:text-base"
+                        aria-label="Page suivante"
+                    >
+                        Suivant <FaChevronRight className="ml-2" />
+                    </button>
+                </div>
+            )}
+
+            {!loading && sortedData.length > 0 && (
+                <div className="mt-4 text-center text-sm text-gray-500">
+                    Affichage {(currentPage - 1) * limit + 1} à {Math.min(currentPage * limit, totalRecords)} sur {totalRecords.toLocaleString()} articles
+                </div>
+            )}
+        </div>
     );
 };
 

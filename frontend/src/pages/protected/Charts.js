@@ -7,7 +7,7 @@ function InternalPage(){
     const dispatch = useDispatch()
 
     useEffect(() => {
-        dispatch(setPageTitle({ title : "Analytics"}))
+        dispatch(setPageTitle({ title: "Tableau de bord des KPI"}))
       }, [])
 
 

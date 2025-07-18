@@ -1,66 +1,79 @@
-import {
-  Chart as ChartJS,
-  Filler,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js';
+import React, { useState, useEffect } from 'react';
 import { Doughnut } from 'react-chartjs-2';
-import TitleCard from '../../../components/Cards/TitleCard';
-import Subtitle from '../../../components/Typography/Subtitle';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
+import { ClipLoader } from 'react-spinners';
 
-ChartJS.register(ArcElement, Tooltip, Legend,
-    Tooltip,
-    Filler,
-    Legend);
+ChartJS.register(ArcElement, Tooltip, Legend);
 
-function DoughnutChart(){
+const DoughnutChart = () => {
+  const [data, setData] = useState({ labels: [], datasets: [] });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-    const options = {
-        responsive: true,
-        plugins: {
-          legend: {
-            position: 'top',
-          },
-        },
-      };
-      
-      const labels = ['Electronics', 'Home Applicances', 'Beauty', 'Furniture', 'Watches', 'Apparel'];
-      
-      const data = {
-        labels,
-        datasets: [
-            {
-                label: '# of Orders',
-                data: [122, 219, 30, 51, 82, 13],
-                backgroundColor: [
-                  'rgba(255, 99, 132, 0.8)',
-                  'rgba(54, 162, 235, 0.8)',
-                  'rgba(255, 206, 86, 0.8)',
-                  'rgba(75, 192, 192, 0.8)',
-                  'rgba(153, 102, 255, 0.8)',
-                  'rgba(255, 159, 64, 0.8)',
-                ],
-                borderColor: [
-                  'rgba(255, 99, 132, 1)',
-                  'rgba(54, 162, 235, 1)',
-                  'rgba(255, 206, 86, 1)',
-                  'rgba(75, 192, 192, 1)',
-                  'rgba(153, 102, 255, 1)',
-                  'rgba(255, 159, 64, 1)',
-                ],
-                borderWidth: 1,
-              }
-        ],
-      };
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`${BASE_URL}/charts/division-distribution`);
+        if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
+        const result = await res.json();
+        if (!result.data) throw new Error('Données invalides');
 
-    return(
-        <TitleCard title={"Orders by Category"}>
-                <Doughnut options={options} data={data} />
-        </TitleCard>
-    )
-}
+        const chartData = {
+          labels: result.data.map(row => row.division || 'Inconnu'),
+          datasets: [{
+            label: 'Distribution par division',
+            data: result.data.map(row => row.article_count),
+            backgroundColor: ['#36b9cc', '#e74c3c', '#2ecc71', '#f1c40f', '#3498db'],
+            borderColor: ['#ffffff'],
+            borderWidth: 1,
+          }],
+        };
+        setData(chartData);
+        setError(null);
+      } catch (error) {
+        console.error('[DoughnutChart] Erreur:', error);
+        setError(`Échec du chargement : ${error.message}`);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [BASE_URL]);
 
+  return (
+    <div className="h-96">
+      {loading ? (
+        <div className="flex items-center justify-center h-full">
+          <ClipLoader color="#3b82f6" size={40} />
+          <p className="ml-3 text-gray-600 text-sm">Chargement...</p>
+        </div>
+      ) : error ? (
+        <div className="flex items-center justify-center h-full">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <span className="text-red-800 text-sm">{error}</span>
+          </div>
+        </div>
+      ) : (
+        <Doughnut
+          data={data}
+          options={{
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'bottom', labels: { font: { size: 12 } } },
+              tooltip: {
+                callbacks: {
+                  label: context => `${context.label}: ${context.raw.toLocaleString('fr-FR')} articles`,
+                },
+              },
+            },
+          }}
+        />
+      )}
+    </div>
+  );
+};
 
-export default DoughnutChart
+export default DoughnutChart;

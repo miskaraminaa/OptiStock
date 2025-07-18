@@ -17,6 +17,7 @@
     "axios": "^1.10.0",
     "capitalize-the-first-letter": "^1.0.8",
     "chart.js": "^4.0.1",
+    "chartjs-adapter-date-fns": "^3.0.0",
     "dayjs": "^1.11.7",
     "framer-motion": "^12.18.1",
     "lodash": "^4.17.21",

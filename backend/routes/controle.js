@@ -131,16 +131,14 @@ router.post('/update', async (req, res) => {
                 return res.status(400).json({ error: "La commande d'achat est requise pour un type de sortie STO." });
             }
 
-            // Fetch available stock data
+            // Fetch available stock data (aggregate across all stores)
             const [stockRows] = await pool.execute(
                 `SELECT 
                     article,
-                    magasin,
-                    (stock_initial + entrees - sorties) AS stock_quantite_controle
+                    SUM(stock_initial + entrees - sorties) AS stock_quantite_controle
                 FROM (
                     SELECT 
                         le.Produit AS article,
-                        si.magasin,
                         COALESCE((
                             SELECT SUM(mig.Qté_validée_SAP)
                             FROM migration mig
@@ -165,13 +163,13 @@ router.post('/update', async (req, res) => {
                             AND le3.Qte_theo_ced_UQA IS NOT NULL
                         ), 0) AS entrees
                     FROM le_tache le
-                    LEFT JOIN stock_iam si ON le.Produit = si.numero_article
-                    GROUP BY le.Produit, si.magasin
+                    GROUP BY le.Produit
                 ) AS stock_data
-                WHERE (stock_initial + entrees - sorties) > 0`
+                WHERE (stock_initial + entrees - sorties) > 0
+                GROUP BY article`
             );
 
-            const stockMap = new Map(stockRows.map(row => [`${row.article}_${row.magasin}`, row.stock_quantite_controle]));
+            const stockMap = new Map(stockRows.map(row => [row.article, row.stock_quantite_controle]));
 
             // Validate articles
             if (!articles || !Array.isArray(articles) || articles.length === 0) {
@@ -179,13 +177,12 @@ router.post('/update', async (req, res) => {
             }
             const validationErrors = [];
             const updatedArticles = articles.map(article => {
-                const key = `${article.article}_${magasin || 'Magasin'}`;
-                const availableQuantity = stockMap.get(key) || 0;
+                const availableQuantity = stockMap.get(article.article) || 0;
                 if (availableQuantity <= 0) {
-                    validationErrors.push(`L'article ${article.article} n'a pas de quantité positive disponible dans le magasin ${magasin || 'Magasin'}.`);
+                    validationErrors.push(`L'article ${article.article} n'a pas de quantité positive disponible.`);
                 }
                 if (article.quantity > availableQuantity) {
-                    validationErrors.push(`La quantité saisie (${article.quantity}) pour l'article ${article.article} dans le magasin ${magasin || 'Magasin'} dépasse la quantité disponible (${availableQuantity}).`);
+                    validationErrors.push(`La quantité saisie (${article.quantity}) pour l'article ${article.article} dépasse la quantité disponible (${availableQuantity}).`);
                 }
                 return {
                     ...article,

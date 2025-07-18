@@ -9,22 +9,24 @@ function Welcome() {
   const dispatch = useDispatch();
 
   useEffect(() => {
-    dispatch(setPageTitle({ title: 'Welcome' }));
+    dispatch(setPageTitle({ title: 'Bienvenue' }));
   }, [dispatch]);
 
   const handleStartNow = () => {
     dispatch(
       showNotification({
-        message: 'Navigating to Dashboard',
+        message: 'Navigation vers le tableau de bord',
         status: 1,
       })
     );
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-100 via-gray-200 to-base-100 flex flex-col">
-      <WelcomeHeader onStartNow={handleStartNow} />
-      <WelcomeFeatures />
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex-grow">
+        <WelcomeHeader onStartNow={handleStartNow} />
+        <WelcomeFeatures />
+      </div>
       <WelcomeFooter />
     </div>
   );

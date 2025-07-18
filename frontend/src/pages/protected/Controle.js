@@ -1,146 +1,143 @@
-import React, { useState, useEffect } from "react";
-import { useDispatch } from "react-redux";
-import TitleCard from "../../components/Cards/TitleCard";
-import TrashIcon from "@heroicons/react/24/outline/TrashIcon";
-import moment from "moment";
-import * as XLSX from "xlsx";
+import React, { useState, useEffect } from "react"; import { useDispatch } from 'react-redux';
+import { motion } from 'framer-motion';
+import { ClipLoader } from 'react-spinners';
+import { FaTrash } from 'react-icons/fa';
+import moment from 'moment';
+import * as XLSX from 'xlsx';
+import { setPageTitle } from '../../features/common/headerSlice';
+import TitleCard from '../../components/Cards/TitleCard';
 
 const Controle = () => {
     const dispatch = useDispatch();
     const [data, setData] = useState([]);
     const [filteredData, setFilteredData] = useState([]);
     const [filters, setFilters] = useState({
-        nOt: "",
-        bs: "",
-        typeSortie: "",
+        nOt: '',
+        bs: '',
+        typeSortie: '',
     });
     const [selectedItems, setSelectedItems] = useState(new Set());
     const [isLoadingData, setIsLoadingData] = useState(false);
     const [error, setError] = useState(null);
     const [showAddForm, setShowAddForm] = useState(false);
     const [newItem, setNewItem] = useState({
-        type_sortie: "OT",
-        nature_sortie: "normal",
-        magasin: "Magasin",
-        articles: [], // Array of { article, designation_article, quantity, quantite_mise_a_jour }
+        type_sortie: 'OT',
+        nature_sortie: 'normal',
+        magasin: 'Magasin',
+        articles: [],
     });
-    const [mb51Articles, setMb51Articles] = useState([]); // Store articles from mb51
-
-    const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+    const [mb51Articles, setMb51Articles] = useState([]);
+    const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
     const COLUMNS = [
-        { header: "N° OT", key: "n_ot" },
-        { header: "N° BS", key: "bs" },
-        { header: "N° LE", key: "le" },
-        { header: "N° STO", key: "commande_achat" },
-        { header: "Nature de sortie", key: "nature_sortie" },
-        { header: "Type de sortie", key: "type_sortie" },
-        { header: "N° Réservation", key: "n_reservation" },
-        { header: "Magasin", key: "magasin" },
-        { header: "Local", key: "local" },
-        { header: "Demandeur", key: "demandeur" },
-        { header: "Préparateur", key: "preparateur" },
-        { header: "Responsable local", key: "responsable_local" },
-        { header: "Articles", key: "articles" },
+        { header: 'N° OT', key: 'n_ot' },
+        { header: 'N° BS', key: 'bs' },
+        { header: 'N° LE', key: 'le' },
+        { header: 'N° STO', key: 'commande_achat' },
+        { header: 'Nature de sortie', key: 'nature_sortie' },
+        { header: 'Type de sortie', key: 'type_sortie' },
+        { header: 'N° Réservation', key: 'n_reservation' },
+        { header: 'Magasin', key: 'magasin' },
+        { header: 'Local', key: 'local' },
+        { header: 'Demandeur', key: 'demandeur' },
+        { header: 'Préparateur', key: 'preparateur' },
+        { header: 'Responsable local', key: 'responsable_local' },
+        { header: 'Articles', key: 'articles' },
     ];
 
     const STOCK_COLUMNS = [
-        { header: "Article", key: "article" },
-        { header: "Désignation", key: "designation_article" },
-        { header: "Stock Initial", key: "stock_initial" },
-        { header: "Sorties", key: "sorties" },
-        { header: "Entrées", key: "entrees" },
-        { header: "Quantité Contrôle", key: "stock_quantite_controle" },
-        { header: "Quantité IAM", key: "quantite_iam" },
-        { header: "Validation", key: "validation" },
+        { header: 'Article', key: 'article' },
+        { header: 'Désignation', key: 'designation_article' },
+        { header: 'Stock Initial', key: 'stock_initial' },
+        { header: 'Sorties', key: 'sorties' },
+        { header: 'Entrées', key: 'entrees' },
+        { header: 'Quantité Contrôle', key: 'stock_quantite_controle' },
+        { header: 'Quantité IAM', key: 'quantite_iam' },
+        { header: 'Validation', key: 'validation' },
     ];
 
     const TYPE_SORTIE_OPTIONS = [
-        { value: "OT", label: "OT" },
-        { value: "BS", label: "BS" },
-        { value: "LE", label: "LE" },
-        { value: "STO", label: "STO" },
+        { value: 'OT', label: 'OT' },
+        { value: 'BS', label: 'BS' },
+        { value: 'LE', label: 'LE' },
+        { value: 'STO', label: 'STO' },
     ];
 
     const NATURE_SORTIE_OPTIONS = [
-        { value: "urgent", label: "Urgent" },
-        { value: "normal", label: "Normal" },
-        { value: "session", label: "Session" },
+        { value: 'urgent', label: 'Urgent' },
+        { value: 'normal', label: 'Normal' },
+        { value: 'session', label: 'Session' },
     ];
 
     const MAGASIN_OPTIONS = [
-        { value: "Magasin", label: "Magasin" },
-        { value: "Magasin EPI", label: "Magasin EPI" },
-        { value: "Parc Exterieur", label: "Parc Exterieur" },
+        { value: 'Magasin', label: 'Magasin' },
+        { value: 'Magasin EPI', label: 'Magasin EPI' },
+        { value: 'Parc Exterieur', label: 'Parc Exterieur' },
     ];
 
     const LOCAL_OPTIONS = {
         Magasin: [
-            { value: "MSLE", label: "MSLE/MSLT - BOUZIT LAHSSAN", responsable: "BOUZIT LAHSSAN" },
-            { value: "MSLV", label: "MSLV/MSRL/MSGP/MSLL/MSPC/DSED - BENDADA MOHAMMED", responsable: "BENDADA MOHAMMED" },
+            { value: 'MSLE', label: 'MSLE/MSLT - BOUZIT LAHSSAN', responsable: 'BOUZIT LAHSSAN' },
+            { value: 'MSLV', label: 'MSLV/MSRL/MSGP/MSLL/MSPC/DSED - BENDADA MOHAMMED', responsable: 'BENDADA MOHAMMED' },
         ],
-        "Magasin EPI": [
-            { value: "MSFE", label: "MSFE - BOUALLAK NOURDINE", responsable: "BOUALLAK NOURDINE" },
-        ],
-        "Parc Exterieur": [
-            { value: "PEXT", label: "PEXT/el kouhail abdelmajid", responsable: "el kouhail abdelmajid" },
-        ],
+        'Magasin EPI': [{ value: 'MSFE', label: 'MSFE - BOUALLAK NOURDINE', responsable: 'BOUALLAK NOURDINE' }],
+        'Parc Exterieur': [{ value: 'PEXT', label: 'PEXT/el kouhail abdelmajid', responsable: 'el kouhail abdelmajid' }],
     };
 
     const RESPONSABLE_MAGASIN = {
-        Magasin: "JAMAL RHENNAOUI",
-        "Magasin EPI": "ELBAHI AMINE",
-        "Parc Exterieur": "SARGALI YOUSSEF",
+        Magasin: 'JAMAL RHENNAOUI',
+        'Magasin EPI': 'ELBAHI AMINE',
+        'Parc Exterieur': 'SARGALI YOUSSEF',
     };
+
+    useEffect(() => {
+        dispatch(setPageTitle({ title: 'Contrôle Livraison' }));
+    }, [dispatch]);
 
     const fetchMb51Articles = async () => {
         try {
-            const res = await fetch(`${BASE_URL}/controle/mb51/articles?magasin=${newItem.magasin || 'Magasin'}`);
+            const res = await fetch(`${BASE_URL}/controle/mb51/articles`);
             if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
             const articles = await res.json();
             setMb51Articles(articles);
         } catch (err) {
             setError(`Échec du chargement des articles : ${err.message}`);
+            console.error('[Controle] Erreur articles:', err);
         }
     };
 
     const fetchData = async () => {
         setIsLoadingData(true);
         setError(null);
-        const url = `${BASE_URL}/controle/data`;
-        const payload = {
-            nOt: filters.nOt || "",
-            bs: filters.bs || "",
-            typeSortie: filters.typeSortie || "",
-        };
         try {
-            const res = await fetch(url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
+            const res = await fetch(`${BASE_URL}/controle/data`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(filters),
             });
             if (!res.ok) throw new Error(`Erreur HTTP ! statut : ${res.status}`);
             const data = await res.json();
-            const normalizedData = data.map(item => ({
+            const normalizedData = data.map((item) => ({
                 ...item,
-                n_ot: item.n_ot ? item.n_ot.trim().toLowerCase() : "",
-                bs: item.bs ? item.bs.trim().toLowerCase() : "",
-                le: item.le ? item.le.trim().toLowerCase() : "",
-                commande_achat: item.commande_achat ? item.commande_achat.trim() : "",
-                nature_sortie: item.nature_sortie ? item.nature_sortie.trim() : "",
-                type_sortie: item.type_sortie ? item.type_sortie.trim().toLowerCase() : "",
-                n_reservation: item.n_reservation ? item.n_reservation.trim() : "",
-                magasin: item.magasin ? item.magasin.trim() : "",
-                local: item.local ? item.local.trim() : "",
-                demandeur: item.demandeur ? item.demandeur.trim() : "",
-                preparateur: item.preparateur ? item.preparateur.trim() : "",
-                responsable_local: item.responsable_local ? item.responsable_local.trim() : "",
+                n_ot: item.n_ot ? item.n_ot.trim().toLowerCase() : '',
+                bs: item.bs ? item.bs.trim().toLowerCase() : '',
+                le: item.le ? item.le.trim().toLowerCase() : '',
+                commande_achat: item.commande_achat ? item.commande_achat.trim() : '',
+                nature_sortie: item.nature_sortie ? item.nature_sortie.trim() : '',
+                type_sortie: item.type_sortie ? item.type_sortie.trim().toLowerCase() : '',
+                n_reservation: item.n_reservation ? item.n_reservation.trim() : '',
+                magasin: item.magasin ? item.magasin.trim() : '',
+                local: item.local ? item.local.trim() : '',
+                demandeur: item.demandeur ? item.demandeur.trim() : '',
+                preparateur: item.preparateur ? item.preparateur.trim() : '',
+                responsable_local: item.responsable_local ? item.responsable_local.trim() : '',
                 articles: typeof item.articles === 'string' ? JSON.parse(item.articles || '[]') : item.articles || [],
             }));
             setData(normalizedData);
             applyFilters(normalizedData);
         } catch (err) {
             setError(`Échec du chargement des données : ${err.message}`);
+            console.error('[Controle] Erreur data:', err);
         } finally {
             setIsLoadingData(false);
         }
@@ -149,24 +146,18 @@ const Controle = () => {
     useEffect(() => {
         fetchData();
         fetchMb51Articles();
-    }, [filters, newItem.magasin]);
+    }, [filters]);
 
     const applyFilters = (data) => {
         let filtered = [...data];
         if (filters.nOt) {
-            filtered = filtered.filter((item) =>
-                item.n_ot?.toLowerCase().includes(filters.nOt.toLowerCase())
-            );
+            filtered = filtered.filter((item) => item.n_ot?.toLowerCase().includes(filters.nOt.toLowerCase()));
         }
         if (filters.bs) {
-            filtered = filtered.filter((item) =>
-                item.bs?.toLowerCase().includes(filters.bs.toLowerCase())
-            );
+            filtered = filtered.filter((item) => item.bs?.toLowerCase().includes(filters.bs.toLowerCase()));
         }
         if (filters.typeSortie) {
-            filtered = filtered.filter((item) =>
-                item.type_sortie?.toLowerCase() === filters.typeSortie.toLowerCase()
-            );
+            filtered = filtered.filter((item) => item.type_sortie?.toLowerCase() === filters.typeSortie.toLowerCase());
         }
         setFilteredData(filtered);
     };
@@ -182,8 +173,8 @@ const Controle = () => {
     };
 
     const addArticle = (article, designation_article) => {
-        if (!newItem.articles.some(a => a.article === article)) {
-            setNewItem(prev => ({
+        if (!newItem.articles.some((a) => a.article === article)) {
+            setNewItem((prev) => ({
                 ...prev,
                 articles: [...prev.articles, { article, designation_article, quantity: 0, quantite_mise_a_jour: 0 }],
             }));
@@ -193,77 +184,59 @@ const Controle = () => {
     const updateQuantity = (index, value) => {
         const updatedArticles = [...newItem.articles];
         const quantity = parseFloat(value) || 0;
-        if (quantity < 0) return; // Prevent negative quantities
-        const mb51Article = mb51Articles.find(a => a.article === updatedArticles[index].article);
+        if (quantity < 0) return;
+        const mb51Article = mb51Articles.find((a) => a.article === updatedArticles[index].article);
         if (mb51Article && quantity > mb51Article.stock_quantite_controle) {
             setError(`Quantité pour ${updatedArticles[index].article} dépasse la quantité contrôle (${mb51Article.stock_quantite_controle})`);
             return;
         }
         updatedArticles[index].quantity = quantity;
         updatedArticles[index].quantite_mise_a_jour = (mb51Article?.stock_quantite_controle || 0) - quantity;
-        setNewItem(prev => ({
-            ...prev,
-            articles: updatedArticles,
-        }));
+        setNewItem((prev) => ({ ...prev, articles: updatedArticles }));
     };
 
     const removeArticle = (index) => {
         const updatedArticles = [...newItem.articles];
         updatedArticles.splice(index, 1);
-        setNewItem(prev => ({
-            ...prev,
-            articles: updatedArticles,
-        }));
+        setNewItem((prev) => ({ ...prev, articles: updatedArticles }));
     };
 
     const updateItems = async (action) => {
         try {
-            if (action === "add" && newItem) {
-                // Validate articles
+            if (action === 'add' && newItem) {
                 if (!newItem.articles || newItem.articles.length === 0) {
-                    throw new Error("Au moins un article doit être fourni.");
+                    throw new Error('Au moins un article doit être fourni.');
                 }
                 for (const article of newItem.articles) {
                     if (!article.article || article.quantity <= 0) {
                         throw new Error(`L'article ${article.article || 'inconnu'} doit avoir une quantité positive.`);
                     }
-                    const mb51Article = mb51Articles.find(a => a.article === article.article);
+                    const mb51Article = mb51Articles.find((a) => a.article === article.article);
                     if (mb51Article && article.quantity > mb51Article.stock_quantite_controle) {
                         throw new Error(`Quantité pour ${article.article} dépasse la quantité contrôle (${mb51Article.stock_quantite_controle}).`);
                     }
                 }
 
-                const selectedLocal = LOCAL_OPTIONS[newItem.magasin]?.find(loc => loc.value === newItem.local);
-                let n_ot = newItem.n_ot || '';
-                let bs = newItem.bs || '';
-                let le = newItem.le || '';
-                let commande_achat = newItem.commande_achat || '';
+                const selectedLocal = LOCAL_OPTIONS[newItem.magasin]?.find((loc) => loc.value === newItem.local);
+                let { n_ot = '', bs = '', le = '', commande_achat = '' } = newItem;
 
-                if (newItem.type_sortie === "OT" && (!n_ot || n_ot.trim() === '')) {
-                    n_ot = `OT${moment().format("YYYYMMDDHHmmss")}`;
+                if (newItem.type_sortie === 'OT' && (!n_ot || n_ot.trim() === '')) {
+                    n_ot = `OT${moment().format('YYYYMMDDHHmmss')}`;
                 }
-                if (newItem.type_sortie === "BS" && (!bs || bs.trim() === '')) {
-                    bs = `BS${moment().format("YYYYMMDDHHmmss")}`;
+                if (newItem.type_sortie === 'BS' && (!bs || bs.trim() === '')) {
+                    bs = `BS${moment().format('YYYYMMDDHHmmss')}`;
                 }
-                if (newItem.type_sortie === "LE" && (!le || le.trim() === '')) {
-                    le = `LE${moment().format("YYYYMMDDHHmmss")}`;
+                if (newItem.type_sortie === 'LE' && (!le || le.trim() === '')) {
+                    le = `LE${moment().format('YYYYMMDDHHmmss')}`;
                 }
-                if (newItem.type_sortie === "STO" && (!commande_achat || commande_achat.trim() === '')) {
-                    commande_achat = `STO${moment().format("YYYYMMDDHHmmss")}`;
+                if (newItem.type_sortie === 'STO' && (!commande_achat || commande_achat.trim() === '')) {
+                    commande_achat = `STO${moment().format('YYYYMMDDHHmmss')}`;
                 }
 
-                if (newItem.type_sortie === "OT" && !n_ot) {
-                    throw new Error("Le N° OT est requis pour un type de sortie OT.");
-                }
-                if (newItem.type_sortie === "BS" && !bs) {
-                    throw new Error("Le BS est requis pour un type de sortie BS.");
-                }
-                if (newItem.type_sortie === "LE" && !le) {
-                    throw new Error("Le LE est requis pour un type de sortie LE.");
-                }
-                if (newItem.type_sortie === "STO" && !commande_achat) {
-                    throw new Error("La commande d'achat est requise pour un type de sortie STO.");
-                }
+                if (newItem.type_sortie === 'OT' && !n_ot) throw new Error('Le N° OT est requis pour un type de sortie OT.');
+                if (newItem.type_sortie === 'BS' && !bs) throw new Error('Le BS est requis pour un type de sortie BS.');
+                if (newItem.type_sortie === 'LE' && !le) throw new Error('Le LE est requis pour un type de sortie LE.');
+                if (newItem.type_sortie === 'STO' && !commande_achat) throw new Error("La commande d'achat est requise pour un type de sortie STO.");
 
                 const itemToAdd = {
                     ...newItem,
@@ -271,9 +244,9 @@ const Controle = () => {
                     bs,
                     le,
                     commande_achat,
-                    responsable_local: selectedLocal?.responsable || newItem.responsable_local || "",
-                    magasin: newItem.magasin || "Magasin",
-                    articles: newItem.articles.map(a => ({
+                    responsable_local: selectedLocal?.responsable || newItem.responsable_local || '',
+                    magasin: newItem.magasin || 'Magasin',
+                    articles: newItem.articles.map((a) => ({
                         article: a.article,
                         designation_article: a.designation_article,
                         quantity: parseFloat(a.quantity) || 0,
@@ -281,27 +254,28 @@ const Controle = () => {
                     })),
                 };
                 const res = await fetch(`${BASE_URL}/controle/update`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action: "add", data: itemToAdd }),
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'add', data: itemToAdd }),
                 });
                 if (!res.ok) throw new Error((await res.json()).error || "Erreur lors de l'ajout");
                 setShowAddForm(false);
-                setNewItem({ type_sortie: "OT", nature_sortie: "normal", magasin: "Magasin", articles: [] });
+                setNewItem({ type_sortie: 'OT', nature_sortie: 'normal', magasin: 'Magasin', articles: [] });
                 await fetchData();
-            } else if (action === "remove" && selectedItems.size > 0) {
-                const nOtsToRemove = Array.from(selectedItems).map(index => filteredData[index].n_ot);
+            } else if (action === 'remove' && selectedItems.size > 0) {
+                const nOtsToRemove = Array.from(selectedItems).map((index) => filteredData[index].n_ot);
                 const res = await fetch(`${BASE_URL}/controle/update`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action: "remove", data: nOtsToRemove }),
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'remove', data: nOtsToRemove }),
                 });
-                if (!res.ok) throw new Error((await res.json()).error || "Erreur lors de la suppression");
+                if (!res.ok) throw new Error((await res.json()).error || 'Erreur lors de la suppression');
                 setSelectedItems(new Set());
                 await fetchData();
             }
         } catch (err) {
             setError(`Échec de la mise à jour : ${err.message}`);
+            console.error('[Controle] Erreur update:', err);
         }
     };
 
@@ -309,493 +283,560 @@ const Controle = () => {
         try {
             const nOtToRemove = filteredData[index].n_ot;
             const res = await fetch(`${BASE_URL}/controle/update`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "remove", data: [nOtToRemove] }),
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'remove', data: [nOtToRemove] }),
             });
-            if (!res.ok) throw new Error((await res.json()).error || "Erreur lors de la suppression");
+            if (!res.ok) throw new Error((await res.json()).error || 'Erreur lors de la suppression');
             setSelectedItems(new Set());
             await fetchData();
         } catch (err) {
             setError(`Échec de la suppression : ${err.message}`);
+            console.error('[Controle] Erreur delete:', err);
         }
     };
 
     const exportToExcel = () => {
-        const livraisonsSheet = XLSX.utils.json_to_sheet(filteredData.map(row => ({
-            ...row,
-            articles: Array.isArray(row.articles) ? row.articles.map(a => `${a.article} (${a.quantity})`).join(', ') : '',
-        })));
+        const livraisonsSheet = XLSX.utils.json_to_sheet(
+            filteredData.map((row) => ({
+                ...row,
+                articles: Array.isArray(row.articles) ? row.articles.map((a) => `${a.article} (${a.quantity})`).join(', ') : '',
+            }))
+        );
         const stockSheet = XLSX.utils.json_to_sheet(mb51Articles);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, livraisonsSheet, "Controle Livraisons");
-        XLSX.utils.book_append_sheet(wb, stockSheet, "Stock Control");
-        XLSX.writeFile(wb, `controle_livraison_${moment().format("YYYYMMDD_HHmmss")}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, livraisonsSheet, 'Controle Livraisons');
+        XLSX.utils.book_append_sheet(wb, stockSheet, 'Stock Control');
+        XLSX.writeFile(wb, `controle_livraison_${moment().format('YYYYMMDD_HHmmss')}.xlsx`);
     };
 
     const handlePrint = () => {
         const printWindow = window.open('', '_blank');
         const printContent = `
-            <html>
-                <head>
-                    <title>Contrôle Livraison - ${moment().format("DD/MM/YYYY HH:mm")}</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; margin: 20px; color: #000; }
-                        h1 { text-align: center; font-size: 24px; margin-bottom: 10px; }
-                        h2 { font-size: 18px; margin: 20px 0 10px; }
-                        p { text-align: center; font-size: 14px; color: #555; margin-bottom: 20px; }
-                        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px; }
-                        th, td { border: 1px solid #000; padding: 8px; text-align: left; }
-                        th { background-color: #f0f0f0; font-weight: bold; text-transform: uppercase; }
-                        tr:nth-child(even) { background-color: #f9f9f9; }
-                        .no-data { text-align: center; padding: 20px; font-style: italic; }
-                        .validation-non-valide { color: red; font-weight: bold; }
-                    </style>
-                </head>
-                <body>
-                    <h1>Contrôle Livraison</h1>
-                    <p>Imprimé le ${moment().format("DD/MM/YYYY HH:mm")}</p>
-                    <h2>Livraisons</h2>
-                    <table>
-                        <thead>
-                            <tr>
-                                ${COLUMNS.map(col => `<th>${col.header}</th>`).join('')}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${filteredData.length === 0
+      <html>
+        <head>
+          <title>Contrôle Livraison - ${moment().format('DD/MM/YYYY HH:mm')}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+            body { font-family: 'Inter', sans-serif; margin: 20px; color: #1f2937; }
+            h1 { text-align: center; font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+            h2 { font-size: 1.125rem; font-weight: 600; margin: 1.5rem 0 0.5rem; }
+            p { text-align: center; font-size: 0.875rem; color: #6b7280; margin-bottom: 1.25rem; }
+            table { width: 100%; border-collapse: collapse; font-size: 0.75rem; margin-bottom: 1.25rem; }
+            th, td { border: 1px solid #e5e7eb; padding: 0.5rem; text-align: left; }
+            th { background-color: #f3f4f6; font-weight: 600; text-transform: uppercase; }
+            tr:nth-child(even) { background-color: #f9fafb; }
+            .no-data { text-align: center; padding: 1.25rem; font-style: italic; color: #6b7280; }
+            .validation-non-valide { color: #dc2626; font-weight: 600; }
+          </style>
+        </head>
+        <body>
+          <h1>Contrôle Livraison</h1>
+          <p>Imprimé le ${moment().format('DD/MM/YYYY HH:mm')}</p>
+          <h2>Livraisons</h2>
+          <table>
+            <thead>
+              <tr>${COLUMNS.map((col) => `<th>${col.header}</th>`).join('')}</tr>
+            </thead>
+            <tbody>
+              ${filteredData.length === 0
                 ? `<tr><td colspan="${COLUMNS.length}" class="no-data">Aucune donnée disponible pour les filtres sélectionnés.</td></tr>`
-                : filteredData.map(row => `
-                                    <tr>
-                                        ${COLUMNS.map(col => `
-                                            <td>${col.key === 'articles' && row[col.key]
-                        ? (Array.isArray(row.articles) ? row.articles.map(a => `${a.article} (${a.quantity})`).join(', ') : '')
-                        : (row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : '')}</td>
-                                        `).join('')}
-                                    </tr>
-                                `).join('')}
-                        </tbody>
-                    </table>
-                    <h2>Stock Control</h2>
-                    <table>
-                        <thead>
-                            <tr>
-                                ${STOCK_COLUMNS.map(col => `<th>${col.header}</th>`).join('')}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${mb51Articles.length === 0
+                : filteredData.map(
+                    (row) => `
+                      <tr>
+                        ${COLUMNS.map(
+                        (col) => `
+                            <td>
+                              ${col.key === 'articles' && row[col.key]
+                                ? Array.isArray(row.articles)
+                                    ? row.articles.map((a) => `${a.article} (${a.quantity})`).join(', ')
+                                    : ''
+                                : row[col.key] !== undefined && row[col.key] !== null
+                                    ? row[col.key]
+                                    : ''}
+                            </td>
+                          `
+                    ).join('')}
+                      </tr>
+                    `
+                ).join('')}
+            </tbody>
+          </table>
+          <h2>Stock Control</h2>
+          <table>
+            <thead>
+              <tr>${STOCK_COLUMNS.map((col) => `<th>${col.header}</th>`).join('')}</tr>
+            </thead>
+            <tbody>
+              ${mb51Articles.length === 0
                 ? `<tr><td colspan="${STOCK_COLUMNS.length}" class="no-data">Aucun article disponible.</td></tr>`
-                : mb51Articles.map(row => `
-                                    <tr>
-                                        ${STOCK_COLUMNS.map(col => `
-                                            <td class="${col.key === 'validation' && row[col.key] !== 'Validé' ? 'validation-non-valide' : ''}">
-                                                ${row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : ''}
-                                            </td>
-                                        `).join('')}
-                                    </tr>
-                                `).join('')}
-                        </tbody>
-                    </table>
-                </body>
-            </html>
-        `;
+                : mb51Articles.map(
+                    (row) => `
+                      <tr>
+                        ${STOCK_COLUMNS.map(
+                        (col) => `
+                            <td class="${col.key === 'validation' && row[col.key] !== 'Validé' ? 'validation-non-valide' : ''}">
+                              ${row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : ''}
+                            </td>
+                          `
+                    ).join('')}
+                      </tr>
+                    `
+                ).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
         printWindow.document.write(printContent);
         printWindow.document.close();
         printWindow.print();
     };
 
     return (
-        <TitleCard title="Contrôle Livraison">
-            <div className="grid grid-cols-1 gap-4">
-                <div className="flex space-x-2 mb-4">
-                    <input
-                        type="text"
-                        placeholder="N° OT"
-                        value={filters.nOt}
-                        onChange={(e) => setFilters({ ...filters, nOt: e.target.value })}
-                        className="p-2 border rounded"
-                    />
-                    <input
-                        type="text"
-                        placeholder="BS"
-                        value={filters.bs}
-                        onChange={(e) => setFilters({ ...filters, bs: e.target.value })}
-                        className="p-2 border rounded"
-                    />
-                    <select
-                        value={filters.typeSortie}
-                        onChange={(e) => setFilters({ ...filters, typeSortie: e.target.value })}
-                        className="p-2 border rounded"
-                    >
-                        <option value="">Tous les types</option>
-                        {TYPE_SORTIE_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                                {option.label}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-                {(error || isLoadingData) && (
-                    <div className="mb-4">
-                        {isLoadingData && <div className="text-blue-500">Chargement des données...</div>}
-                        {error && <div className="text-red-500">{error}</div>}
-                    </div>
-                )}
-                <div className="flex space-x-2 mb-4">
-                    <button
-                        onClick={() => setShowAddForm(!showAddForm)}
-                        className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
-                        disabled={isLoadingData}
-                    >
-                        {showAddForm ? "Annuler" : "Ajouter"}
-                    </button>
-                    <button
-                        onClick={() => updateItems("remove")}
-                        className="bg-red-500 text-white p-2 rounded hover:bg-red-600"
-                        disabled={selectedItems.size === 0 || isLoadingData}
-                    >
-                        Retirer
-                    </button>
-                    <button
-                        onClick={exportToExcel}
-                        className="bg-green-500 text-white p-2 rounded hover:bg-green-600"
-                        disabled={isLoadingData}
-                    >
-                        Exporter Excel
-                    </button>
-                    <button
-                        onClick={handlePrint}
-                        className="bg-yellow-500 text-white p-2 rounded hover:bg-yellow-600"
-                        disabled={isLoadingData}
-                    >
-                        Imprimer
-                    </button>
-                </div>
-                {showAddForm && (
-                    <div className="mb-4 p-4 border rounded bg-gray-50">
-                        <h3 className="text-lg font-semibold mb-2">Ajouter une nouvelle livraison</h3>
-                        <form
-                            onSubmit={(e) => {
-                                e.preventDefault();
-                                updateItems("add");
-                            }}
-                            className="grid grid-cols-2 gap-4"
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6"
+        >
+            <TitleCard title="Contrôle Livraison">
+                <div className="space-y-6">
+                    <div className="flex flex-wrap gap-4">
+                        <input
+                            type="text"
+                            placeholder="N° OT"
+                            value={filters.nOt}
+                            onChange={(e) => setFilters({ ...filters, nOt: e.target.value })}
+                            className="p-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full sm:w-48"
+                        />
+                        <input
+                            type="text"
+                            placeholder="N° BS"
+                            value={filters.bs}
+                            onChange={(e) => setFilters({ ...filters, bs: e.target.value })}
+                            className="p-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full sm:w-48"
+                        />
+                        <select
+                            value={filters.typeSortie}
+                            onChange={(e) => setFilters({ ...filters, typeSortie: e.target.value })}
+                            className="p-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full sm:w-48"
                         >
-                            <select
-                                value={newItem.type_sortie}
-                                onChange={(e) => setNewItem({ ...newItem, type_sortie: e.target.value, n_ot: "", bs: "", le: "", commande_achat: "" })}
-                                className="p-2 border rounded"
-                            >
-                                {TYPE_SORTIE_OPTIONS.map((option) => (
-                                    <option key={option.value} value={option.value}>
-                                        {option.label}
-                                    </option>
-                                ))}
-                            </select>
-                            {newItem.type_sortie === "OT" && (
-                                <input
-                                    type="text"
-                                    placeholder="N° OT"
-                                    value={newItem.n_ot || ""}
-                                    onChange={(e) => setNewItem({ ...newItem, n_ot: e.target.value })}
-                                    className="p-2 border rounded"
-                                    required
-                                />
-                            )}
-                            {newItem.type_sortie === "BS" && (
-                                <input
-                                    type="text"
-                                    placeholder="BS"
-                                    value={newItem.bs || ""}
-                                    onChange={(e) => setNewItem({ ...newItem, bs: e.target.value })}
-                                    className="p-2 border rounded"
-                                    required
-                                />
-                            )}
-                            {newItem.type_sortie === "LE" && (
-                                <input
-                                    type="text"
-                                    placeholder="LE"
-                                    value={newItem.le || ""}
-                                    onChange={(e) => setNewItem({ ...newItem, le: e.target.value })}
-                                    className="p-2 border rounded"
-                                    required
-                                />
-                            )}
-                            {newItem.type_sortie === "STO" && (
-                                <input
-                                    type="text"
-                                    placeholder="STO"
-                                    value={newItem.commande_achat || ""}
-                                    onChange={(e) => setNewItem({ ...newItem, commande_achat: e.target.value })}
-                                    className="p-2 border rounded"
-                                    required
-                                />
-                            )}
-                            <select
-                                value={newItem.nature_sortie}
-                                onChange={(e) => setNewItem({ ...newItem, nature_sortie: e.target.value })}
-                                className="p-2 border rounded"
-                            >
-                                {NATURE_SORTIE_OPTIONS.map((option) => (
-                                    <option key={option.value} value={option.value}>
-                                        {option.label}
-                                    </option>
-                                ))}
-                            </select>
-                            <input
-                                type="text"
-                                placeholder="N° Réservation"
-                                value={newItem.n_reservation || ""}
-                                onChange={(e) => setNewItem({ ...newItem, n_reservation: e.target.value })}
-                                className="p-2 border rounded"
-                            />
-                            <select
-                                value={newItem.magasin}
-                                onChange={(e) => setNewItem({ ...newItem, magasin: e.target.value, local: "", responsable_local: "" })}
-                                className="p-2 border rounded"
-                            >
-                                {MAGASIN_OPTIONS.map((option) => (
-                                    <option key={option.value} value={option.value}>
-                                        {option.label} - {RESPONSABLE_MAGASIN[option.value]}
-                                    </option>
-                                ))}
-                            </select>
-                            <select
-                                value={newItem.local}
-                                onChange={(e) => {
-                                    const selectedLocal = LOCAL_OPTIONS[newItem.magasin]?.find(loc => loc.value === e.target.value);
-                                    setNewItem({
-                                        ...newItem,
-                                        local: e.target.value,
-                                        responsable_local: selectedLocal?.responsable || "",
-                                    });
+                            <option value="">Tous les types</option>
+                            {TYPE_SORTIE_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    {isLoadingData || error ? (
+                        <div className="flex items-center gap-2 text-sm">
+                            {isLoadingData && <ClipLoader color="#3b82f6" size={20} />}
+                            {isLoadingData && <span className="text-gray-600">Chargement des données...</span>}
+                            {error && <span className="text-red-600">⚠️ {error}</span>}
+                        </div>
+                    ) : null}
+                    <div className="flex flex-wrap gap-4">
+                        <button
+                            onClick={() => setShowAddForm(!showAddForm)}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-all duration-200 text-sm font-medium"
+                            disabled={isLoadingData}
+                        >
+                            {showAddForm ? 'Annuler' : 'Ajouter'}
+                        </button>
+                        <button
+                            onClick={() => updateItems('remove')}
+                            className="px-4 py-2 bg-red-600 text-white rounded-lg shadow hover:bg-red-700 transition-all duration-200 text-sm font-medium"
+                            disabled={selectedItems.size === 0 || isLoadingData}
+                        >
+                            Retirer
+                        </button>
+                        <button
+                            onClick={exportToExcel}
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition-all duration-200 text-sm font-medium"
+                            disabled={isLoadingData}
+                        >
+                            Exporter Excel
+                        </button>
+                        <button
+                            onClick={handlePrint}
+                            className="px-4 py-2 bg-yellow-600 text-white rounded-lg shadow hover:bg-yellow-700 transition-all duration-200 text-sm font-medium"
+                            disabled={isLoadingData}
+                        >
+                            Imprimer
+                        </button>
+                    </div>
+                    {showAddForm && (
+                        <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            transition={{ duration: 0.3 }}
+                            className="p-6 bg-white shadow-lg rounded-lg"
+                        >
+                            <h3 className="text-lg font-semibold text-gray-800 mb-4">Ajouter une nouvelle livraison</h3>
+                            <form
+                                onSubmit={(e) => {
+                                    e.preventDefault();
+                                    updateItems('add');
                                 }}
-                                className="p-2 border rounded"
-                                disabled={!newItem.magasin}
+                                className="grid grid-cols-1 sm:grid-cols-2 gap-4"
                             >
-                                <option value="">Sélectionner un local</option>
-                                {newItem.magasin && LOCAL_OPTIONS[newItem.magasin]?.map((option) => (
-                                    <option key={option.value} value={option.value}>
-                                        {option.label}
-                                    </option>
-                                ))}
-                            </select>
-                            <input
-                                type="text"
-                                placeholder="Demandeur"
-                                value={newItem.demandeur || ""}
-                                onChange={(e) => setNewItem({ ...newItem, demandeur: e.target.value })}
-                                className="p-2 border rounded"
-                            />
-                            <input
-                                type="text"
-                                placeholder="Préparateur"
-                                value={newItem.preparateur || ""}
-                                onChange={(e) => setNewItem({ ...newItem, preparateur: e.target.value })}
-                                className="p-2 border rounded"
-                            />
-                            <input
-                                type="text"
-                                placeholder="Responsable local"
-                                value={newItem.responsable_local || ""}
-                                readOnly
-                                className="p-2 border rounded bg-gray-100"
-                            />
-                            <div className="col-span-2">
-                                <h4 className="text-md font-semibold mb-2">Ajouter des articles</h4>
-                                <select
-                                    onChange={(e) => {
-                                        const [article, designation_article] = e.target.value.split(" - ");
-                                        if (article && designation_article) {
-                                            addArticle(article, designation_article);
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Type de sortie</label>
+                                    <select
+                                        value={newItem.type_sortie}
+                                        onChange={(e) =>
+                                            setNewItem({ ...newItem, type_sortie: e.target.value, n_ot: '', bs: '', le: '', commande_achat: '' })
                                         }
-                                        e.target.value = ""; // Reset dropdown
-                                    }}
-                                    className="p-2 border rounded w-full mb-2"
-                                    disabled={mb51Articles.length === 0}
-                                >
-                                    <option value="">Sélectionner un article</option>
-                                    {mb51Articles.length > 0 ? (
-                                        [...new Set(mb51Articles.map(a => a.article))].map(article => {
-                                            const designation = mb51Articles.find(a => a.article === article)?.designation_article;
-                                            return (
-                                                <option key={article} value={`${article} - ${designation}`}>
-                                                    {article} - {designation} (Quantité Contrôle: {mb51Articles.find(a => a.article === article)?.stock_quantite_controle || 0})
-                                                </option>
-                                            );
-                                        })
-                                    ) : (
-                                        <option disabled>Aucun article disponible</option>
-                                    )}
-                                </select>
-                                {newItem.articles.length > 0 && (
-                                    <div className="mt-2 overflow-x-auto">
-                                        <table className="w-full text-sm border-collapse">
-                                            <thead>
-                                                <tr className="bg-gray-100">
-                                                    <th className="border p-2 text-left">Code</th>
-                                                    <th className="border p-2 text-left">Désignation</th>
-                                                    <th className="border p-2 text-left">Quantité Contrôle</th>
-                                                    <th className="border p-2 text-left">Quantité</th>
-                                                    <th className="border p-2 text-left">Quantité Mise à Jour</th>
-                                                    <th className="border p-2 text-left">Actions</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {newItem.articles.map((article, index) => {
-                                                    const mb51Article = mb51Articles.find(a => a.article === article.article);
-                                                    return (
-                                                        <tr key={article.article} className="hover:bg-gray-50">
-                                                            <td className="border p-2">{article.article}</td>
-                                                            <td className="border p-2">{article.designation_article}</td>
-                                                            <td className="border p-2">{mb51Article?.stock_quantite_controle || 0}</td>
-                                                            <td className="border p-2">
-                                                                <input
-                                                                    type="number"
-                                                                    min="0"
-                                                                    step="1"
-                                                                    value={article.quantity}
-                                                                    onChange={(e) => updateQuantity(index, e.target.value)}
-                                                                    className="p-1 border rounded w-20"
-                                                                    placeholder="Quantité"
-                                                                />
-                                                            </td>
-                                                            <td className="border p-2">{article.quantite_mise_a_jour !== undefined ? article.quantite_mise_a_jour : 0}</td>
-                                                            <td className="border p-2">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => removeArticle(index)}
-                                                                    className="text-red-500 hover:text-red-700"
-                                                                >
-                                                                    <TrashIcon className="h-5 w-5" />
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
+                                        className="p-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full"
+                                    >
+                                        {TYPE_SORTIE_OPTIONS.map((option) => (
+                                            <option key={option.value} value={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                {newItem.type_sortie === 'OT' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">N° OT</label>
+                                        <input
+                                            type="text"
+                                            placeholder="N° OT"
+                                            value={newItem.n_ot || ''}
+                                            onChange={(e) => setNewItem({ ...newItem, n_ot: e.target.value })}
+                                            className="p-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full"
+                                            required
+                                        />
                                     </div>
                                 )}
-                                {newItem.articles.length === 0 && <p className="text-gray-500 italic">Aucun article sélectionné.</p>}
-                            </div>
-                            <button
-                                type="submit"
-                                className="col-span-2 bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
-                                disabled={isLoadingData || newItem.articles.length === 0}
-                            >
-                                Ajouter la livraison
-                            </button>
-                        </form>
-                    </div>
-                )}
-                <div className="mt-4 overflow-x-auto">
-                    <h3 className="text-lg font-semibold mb-2">Stock Control</h3>
-                    <table className="w-full text-sm border-collapse">
-                        <thead>
-                            <tr className="bg-gray-100">
-                                {STOCK_COLUMNS.map(col => (
-                                    <th key={col.key} className="border p-2 text-left">{col.header}</th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {mb51Articles.length === 0 ? (
-                                <tr>
-                                    <td colSpan={STOCK_COLUMNS.length} className="border p-2 text-center text-gray-500">
-                                        Aucun article disponible.
-                                    </td>
-                                </tr>
-                            ) : (
-                                mb51Articles.map((row, index) => (
-                                    <tr key={index} className="hover:bg-gray-50">
-                                        {STOCK_COLUMNS.map(col => (
-                                            <td
-                                                key={col.key}
-                                                className={`border p-2 ${col.key === 'validation' && row[col.key] !== 'Validé' ? 'text-red-500 font-bold' : ''}`}
-                                            >
-                                                {row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : ''}
-                                            </td>
+                                {newItem.type_sortie === 'BS' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">N° BS</label>
+                                        <input
+                                            type="text"
+                                            placeholder="N° BS"
+                                            value={newItem.bs || ''}
+                                            onChange={(e) => setNewItem({ ...newItem, bs: e.target.value })}
+                                            className="p-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full"
+                                            required
+                                        />
+                                    </div>
+                                )}
+                                {newItem.type_sortie === 'LE' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">N° LE</label>
+                                        <input
+                                            type="text"
+                                            placeholder="N° LE"
+                                            value={newItem.le || ''}
+                                            onChange={(e) => setNewItem({ ...newItem, le: e.target.value })}
+                                            className="p-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full"
+                                            required
+                                        />
+                                    </div>
+                                )}
+                                {newItem.type_sortie === 'STO' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">N° STO</label>
+                                        <input
+                                            type="text"
+                                            placeholder="N° STO"
+                                            value={newItem.commande_achat || ''}
+                                            onChange={(e) => setNewItem({ ...newItem, commande_achat: e.target.value })}
+                                            className="p-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full"
+                                            required
+                                        />
+                                    </div>
+                                )}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Nature de sortie</label>
+                                    <select
+                                        value={newItem.nature_sortie}
+                                        onChange={(e) => setNewItem({ ...newItem, nature_sortie: e.target.value })}
+                                        className="p-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full"
+                                    >
+                                        {NATURE_SORTIE_OPTIONS.map((option) => (
+                                            <option key={option.value} value={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">N° Réservation</label>
+                                    <input
+                                        type="text"
+                                        placeholder="N° Réservation"
+                                        value={newItem.n_reservation || ''}
+                                        onChange={(e) => setNewItem({ ...newItem, n_reservation: e.target.value })}
+                                        className="p-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Magasin</label>
+                                    <select
+                                        value={newItem.magasin}
+                                        onChange={(e) => setNewItem({ ...newItem, magasin: e.target.value, local: '', responsable_local: '' })}
+                                        className="p-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full"
+                                    >
+                                        {MAGASIN_OPTIONS.map((option) => (
+                                            <option key={option.value} value={option.value}>
+                                                {option.label} - {RESPONSABLE_MAGASIN[option.value]}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Local</label>
+                                    <select
+                                        value={newItem.local}
+                                        onChange={(e) => {
+                                            const selectedLocal = LOCAL_OPTIONS[newItem.magasin]?.find((loc) => loc.value === e.target.value);
+                                            setNewItem({
+                                                ...newItem,
+                                                local: e.target.value,
+                                                responsable_local: selectedLocal?.responsable || '',
+                                            });
+                                        }}
+                                        className="p-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full"
+                                        disabled={!newItem.magasin}
+                                    >
+                                        <option value="">Sélectionner un local</option>
+                                        {newItem.magasin &&
+                                            LOCAL_OPTIONS[newItem.magasin]?.map((option) => (
+                                                <option key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </option>
+                                            ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Demandeur</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Demandeur"
+                                        value={newItem.demandeur || ''}
+                                        onChange={(e) => setNewItem({ ...newItem, demandeur: e.target.value })}
+                                        className="p-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Préparateur</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Préparateur"
+                                        value={newItem.preparateur || ''}
+                                        onChange={(e) => setNewItem({ ...newItem, preparateur: e.target.value })}
+                                        className="p-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Responsable local</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Responsable local"
+                                        value={newItem.responsable_local || ''}
+                                        readOnly
+                                        className="p-2.5 border border-gray-300 rounded-lg shadow-sm bg-gray-100 text-sm w-full"
+                                    />
+                                </div>
+                                <div className="col-span-1 sm:col-span-2">
+                                    <h4 className="text-md font-semibold text-gray-800 mb-2">Ajouter des articles</h4>
+                                    <select
+                                        onChange={(e) => {
+                                            const [article, designation_article] = e.target.value.split(' - ');
+                                            if (article && designation_article) {
+                                                addArticle(article, designation_article);
+                                            }
+                                            e.target.value = '';
+                                        }}
+                                        className="p-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full mb-2"
+                                        disabled={mb51Articles.length === 0}
+                                    >
+                                        <option value="">Sélectionner un article</option>
+                                        {mb51Articles.length > 0 ? (
+                                            [...new Set(mb51Articles.map((a) => a.article))].map((article) => {
+                                                const mb51Article = mb51Articles.find((a) => a.article === article);
+                                                return (
+                                                    <option key={article} value={`${article} - ${mb51Article.designation_article}`}>
+                                                        {article} - {mb51Article.designation_article} (Quantité Contrôle: {mb51Article.stock_quantite_controle || 0})
+                                                    </option>
+                                                );
+                                            })
+                                        ) : (
+                                            <option disabled>Aucun article disponible</option>
+                                        )}
+                                    </select>
+                                    {newItem.articles.length > 0 && (
+                                        <div className="mt-2 overflow-x-auto">
+                                            <table className="w-full text-sm border-collapse bg-white shadow-lg rounded-lg">
+                                                <thead>
+                                                    <tr className="bg-gray-100">
+                                                        <th className="border border-gray-200 p-2 text-left text-gray-700">Code</th>
+                                                        <th className="border border-gray-200 p-2 text-left text-gray-700">Désignation</th>
+                                                        <th className="border border-gray-200 p-2 text-left text-gray-700">Quantité Contrôle</th>
+                                                        <th className="border border-gray-200 p-2 text-left text-gray-700">Quantité</th>
+                                                        <th className="border border-gray-200 p-2 text-left text-gray-700">Quantité Mise à Jour</th>
+                                                        <th className="border border-gray-200 p-2 text-left text-gray-700">Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {newItem.articles.map((article, index) => {
+                                                        const mb51Article = mb51Articles.find((a) => a.article === article.article);
+                                                        return (
+                                                            <tr key={article.article} className="hover:bg-gray-50">
+                                                                <td className="border border-gray-200 p-2">{article.article}</td>
+                                                                <td className="border border-gray-200 p-2">{article.designation_article}</td>
+                                                                <td className="border border-gray-200 p-2">{mb51Article?.stock_quantite_controle || 0}</td>
+                                                                <td className="border border-gray-200 p-2">
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        step="1"
+                                                                        value={article.quantity}
+                                                                        onChange={(e) => updateQuantity(index, e.target.value)}
+                                                                        className="p-1.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-20"
+                                                                        placeholder="Quantité"
+                                                                    />
+                                                                </td>
+                                                                <td className="border border-gray-200 p-2">{article.quantite_mise_a_jour !== undefined ? article.quantite_mise_a_jour : 0}</td>
+                                                                <td className="border border-gray-200 p-2">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => removeArticle(index)}
+                                                                        className="text-red-600 hover:text-red-700 transition-colors duration-200"
+                                                                    >
+                                                                        <FaTrash className="h-4 w-4" />
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                    {newItem.articles.length === 0 && <p className="text-gray-600 text-sm italic">Aucun article sélectionné.</p>}
+                                </div>
+                                <button
+                                    type="submit"
+                                    className="col-span-1 sm:col-span-2 px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-all duration-200 text-sm font-medium"
+                                    disabled={isLoadingData || newItem.articles.length === 0}
+                                >
+                                    Ajouter la livraison
+                                </button>
+                            </form>
+                        </motion.div>
+                    )}
+                    <div className="mt-6">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Stock Control</h3>
+                        <div className="overflow-x-auto bg-white shadow-lg rounded-lg">
+                            <table className="w-full text-sm border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-100">
+                                        {STOCK_COLUMNS.map((col) => (
+                                            <th key={col.key} className="border border-gray-200 p-2 text-left text-gray-700">
+                                                {col.header}
+                                            </th>
                                         ))}
                                     </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-                <div className="mt-4 overflow-x-auto">
-                    <h3 className="text-lg font-semibold mb-2">Livraisons</h3>
-                    <table id="controle-table" className="w-full text-sm text-left text-gray-500">
-                        <thead className="text-xs text-gray-700 uppercase bg-gray-50">
-                            <tr>
-                                <th className="px-4 py-2">
-                                    <input
-                                        type="checkbox"
-                                        onChange={(e) =>
-                                            setSelectedItems(
-                                                e.target.checked
-                                                    ? new Set(filteredData.map((_, i) => i))
-                                                    : new Set()
-                                            )
-                                        }
-                                        disabled={isLoadingData}
-                                    />
-                                </th>
-                                {COLUMNS.map((col) => (
-                                    <th key={col.key} className="px-4 py-2">
-                                        {col.header}
-                                    </th>
-                                ))}
-                                <th className="px-4 py-2">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredData.length === 0 ? (
-                                <tr>
-                                    <td colSpan={COLUMNS.length + 2} className="px-4 py-2 text-center text-gray-500">
-                                        Aucune donnée disponible pour les filtres sélectionnés.
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredData.map((row, index) => (
-                                    <tr
-                                        key={index}
-                                        className={`${selectedItems.has(index) ? "bg-gray-100" : ""} border-b hover:bg-gray-50`}
-                                    >
-                                        <td className="px-4 py-2">
+                                </thead>
+                                <tbody>
+                                    {mb51Articles.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={STOCK_COLUMNS.length} className="border border-gray-200 p-2 text-center text-gray-600">
+                                                Aucun article disponible.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        mb51Articles.map((row, index) => (
+                                            <tr key={index} className="hover:bg-gray-50">
+                                                {STOCK_COLUMNS.map((col) => (
+                                                    <td
+                                                        key={col.key}
+                                                        className={`border border-gray-200 p-2 ${col.key === 'validation' && row[col.key] !== 'Validé' ? 'text-red-600 font-semibold' : ''}`}
+                                                    >
+                                                        {row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : ''}
+                                                    </td>
+                                                ))}
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div className="mt-6">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Livraisons</h3>
+                        <div className="overflow-x-auto bg-white shadow-lg rounded-lg">
+                            <table className="w-full text-sm border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-100">
+                                        <th className="border border-gray-200 p-2">
                                             <input
                                                 type="checkbox"
-                                                checked={selectedItems.has(index)}
-                                                onChange={() => toggleItem(index)}
+                                                onChange={(e) => setSelectedItems(e.target.checked ? new Set(filteredData.map((_, i) => i)) : new Set())}
                                                 disabled={isLoadingData}
                                             />
-                                        </td>
+                                        </th>
                                         {COLUMNS.map((col) => (
-                                            <td key={col.key} className="px-4 py-2">
-                                                {col.key === 'articles' && row[col.key]
-                                                    ? (Array.isArray(row[col.key]) ? row[col.key].map(a => `${a.article} (${a.quantity})`).join(', ') : '')
-                                                    : (row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : '')}
-                                            </td>
+                                            <th key={col.key} className="border border-gray-200 p-2 text-left text-gray-700">
+                                                {col.header}
+                                            </th>
                                         ))}
-                                        <td className="px-4 py-2">
-                                            <button
-                                                onClick={() => handleDelete(index)}
-                                                className="text-red-500 hover:text-red-700"
-                                                disabled={isLoadingData}
-                                            >
-                                                <TrashIcon className="h-5 w-5" />
-                                            </button>
-                                        </td>
+                                        <th className="border border-gray-200 p-2 text-left text-gray-700">Actions</th>
                                     </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
+                                </thead>
+                                <tbody>
+                                    {filteredData.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={COLUMNS.length + 2} className="border border-gray-200 p-2 text-center text-gray-600">
+                                                Aucune donnée disponible pour les filtres sélectionnés.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        filteredData.map((row, index) => (
+                                            <tr key={index} className={`${selectedItems.has(index) ? 'bg-gray-50' : ''} hover:bg-gray-50`}>
+                                                <td className="border border-gray-200 p-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedItems.has(index)}
+                                                        onChange={() => toggleItem(index)}
+                                                        disabled={isLoadingData}
+                                                    />
+                                                </td>
+                                                {COLUMNS.map((col) => (
+                                                    <td key={col.key} className="border border-gray-200 p-2">
+                                                        {col.key === 'articles' && row[col.key]
+                                                            ? Array.isArray(row.articles)
+                                                                ? row.articles.map((a) => `${a.article} (${a.quantity})`).join(', ')
+                                                                : ''
+                                                            : row[col.key] !== undefined && row[col.key] !== null
+                                                                ? row[col.key]
+                                                                : ''}
+                                                    </td>
+                                                ))}
+                                                <td className="border border-gray-200 p-2">
+                                                    <button
+                                                        onClick={() => handleDelete(index)}
+                                                        className="text-red-600 hover:text-red-700 transition-colors duration-200"
+                                                        disabled={isLoadingData}
+                                                    >
+                                                        <FaTrash className="h-4 w-4" />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </TitleCard>
+            </TitleCard>
+        </motion.div>
     );
 };
 

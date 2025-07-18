@@ -1,0 +1,79 @@
+import React, { useState, useEffect } from 'react';
+import { Pie } from 'react-chartjs-2';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
+import { ClipLoader } from 'react-spinners';
+
+ChartJS.register(ArcElement, Tooltip, Legend);
+
+const PieChart = () => {
+    const [data, setData] = useState({ labels: [], datasets: [] });
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const res = await fetch(`${BASE_URL}/charts/type-stock-distribution`);
+                if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
+                const result = await res.json();
+                if (!result.data) throw new Error('Données invalides');
+
+                const chartData = {
+                    labels: result.data.map(row => row.type_stock || 'Inconnu'),
+                    datasets: [{
+                        label: 'Distribution par type de stock',
+                        data: result.data.map(row => row.article_count),
+                        backgroundColor: ['#36b9cc', '#e74c3c', '#2ecc71', '#f1c40f', '#3498db'],
+                        borderColor: ['#ffffff'],
+                        borderWidth: 1,
+                    }],
+                };
+                setData(chartData);
+                setError(null);
+            } catch (error) {
+                console.error('[PieChart] Erreur:', error);
+                setError(`Échec du chargement : ${error.message}`);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, [BASE_URL]);
+
+    return (
+        <div className="h-96">
+            {loading ? (
+                <div className="flex items-center justify-center h-full">
+                    <ClipLoader color="#3b82f6" size={40} />
+                    <p className="ml-3 text-gray-600 text-sm">Chargement...</p>
+                </div>
+            ) : error ? (
+                <div className="flex items-center justify-center h-full">
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <span className="text-red-800 text-sm">{error}</span>
+                    </div>
+                </div>
+            ) : (
+                <Pie
+                    data={data}
+                    options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { font: { size: 12 } } },
+                            tooltip: {
+                                callbacks: {
+                                    label: context => `${context.label}: ${context.raw.toLocaleString('fr-FR')} articles`,
+                                },
+                            },
+                        },
+                    }}
+                />
+            )}
+        </div>
+    );
+};
+
+export default PieChart;

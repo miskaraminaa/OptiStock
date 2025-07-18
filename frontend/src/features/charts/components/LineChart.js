@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, LineElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend } from 'chart.js';
+import { ClipLoader } from 'react-spinners';
 
 ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend);
 
@@ -18,7 +19,10 @@ const LineChart = ({ startDate, endDate, article }) => {
       try {
         const formatDate = (date) => {
           if (!date) return null;
-          if (typeof date === 'string') return date;
+          if (typeof date === 'string') {
+            const parsed = new Date(date);
+            return isNaN(parsed) ? null : parsed.toISOString().split('T')[0];
+          }
           return date.toISOString().split('T')[0];
         };
 
@@ -26,7 +30,7 @@ const LineChart = ({ startDate, endDate, article }) => {
         const formattedEndDate = formatDate(endDate);
 
         if (!formattedStartDate || !formattedEndDate) {
-          throw new Error('Invalid date range provided');
+          throw new Error('Plage de dates invalide fournie');
         }
 
         const url = new URL(`${BASE_URL}/charts/stock-over-time`);
@@ -36,47 +40,49 @@ const LineChart = ({ startDate, endDate, article }) => {
           url.searchParams.append('article', article);
         }
 
-        console.log('Fetching data from:', url.toString());
+        console.log('[Graphique en ligne] Récupération des données depuis :', url.toString());
 
         const res = await fetch(url.toString());
 
         if (!res.ok) {
           const errorText = await res.text();
-          throw new Error(`HTTP ${res.status}: ${errorText}`);
+          throw new Error(`Erreur HTTP ${res.status} : ${errorText}`);
         }
 
         const result = await res.json();
-        console.log('API Response:', result);
+        console.log('[Graphique en ligne] Réponse API :', result);
 
         if (!result.data || !Array.isArray(result.data)) {
-          throw new Error('Invalid data format received from API');
+          throw new Error('Format de données invalide reçu de l\'API');
         }
 
         if (result.data.length === 0) {
           setData({
             labels: [],
             datasets: [{
-              label: 'Stock Quantity',
+              label: article ? `Stock pour ${article}` : 'Quantité totale en stock',
               data: [],
               borderColor: 'rgba(75, 192, 192, 1)',
               backgroundColor: 'rgba(75, 192, 192, 0.2)',
               fill: true,
               tension: 0.1,
-            }]
+              pointRadius: 3,
+              pointHoverRadius: 5,
+            }],
           });
-          setError('No data available for the selected date range');
+          setError('Aucune donnée disponible pour la plage de dates sélectionnée');
           return;
         }
 
         const processedData = result.data.map(row => ({
-          date: new Date(row.date).toLocaleDateString(),
-          total_quantity: parseFloat(row.total_quantity) || 0
+          date: new Date(row.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+          total_quantity: parseFloat(row.total_quantity) || 0,
         }));
 
         const chartData = {
           labels: processedData.map(row => row.date),
           datasets: [{
-            label: article ? `Stock for ${article}` : 'Total Stock Quantity',
+            label: article ? `Stock pour ${article}` : 'Quantité totale en stock',
             data: processedData.map(row => row.total_quantity),
             borderColor: 'rgba(75, 192, 192, 1)',
             backgroundColor: 'rgba(75, 192, 192, 0.2)',
@@ -91,8 +97,8 @@ const LineChart = ({ startDate, endDate, article }) => {
         setError(null);
 
       } catch (error) {
-        console.error('Error fetching LineChart data:', error);
-        setError(`Failed to load data: ${error.message}`);
+        console.error('[Graphique en ligne] Erreur lors de la récupération des données :', error);
+        setError(`Échec du chargement des données : ${error.message}`);
         setData({ labels: [], datasets: [] });
       } finally {
         setLoading(false);
@@ -102,24 +108,31 @@ const LineChart = ({ startDate, endDate, article }) => {
     if (startDate && endDate) {
       fetchData();
     } else {
-      setError('Please provide valid start and end dates');
+      setError('Veuillez fournir des dates de début et de fin valides');
       setLoading(false);
     }
   }, [startDate, endDate, article, BASE_URL]);
 
   return (
-    <div className="bg-white p-2 rounded-lg shadow-lg h-80 flex flex-col"> {/* Adjusted to h-48 for consistency */}
-      <h2 className="text-lg font-semibold mb-1 flex-shrink-0"> {/* Reduced margin */}
-        Stock Levels Over Time
+    <div className="bg-white rounded-lg shadow-lg p-6 h-96 flex flex-col">
+      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex-shrink-0">
+        Niveaux de stock au fil du temps
         {article && <span className="text-sm text-gray-600 ml-2">({article})</span>}
-      </h2>
+      </h3>
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-gray-500">Loading...</p>
+          <ClipLoader color="#3b82f6" size={40} />
+          <p className="ml-3 text-gray-600 text-sm">Chargement...</p>
         </div>
       ) : error ? (
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-red-500 text-center">{error}</p>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+            <span className="text-red-800 text-sm">{error}</span>
+          </div>
+        </div>
+      ) : data.labels.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-gray-500 text-sm text-center">Aucune donnée disponible pour la période sélectionnée</p>
         </div>
       ) : (
         <div className="flex-1 min-h-0 relative">
@@ -128,54 +141,54 @@ const LineChart = ({ startDate, endDate, article }) => {
             options={{
               responsive: true,
               maintainAspectRatio: false,
-              height: 150, // Fixed height to match other charts
               scales: {
                 x: {
                   title: {
                     display: true,
                     text: 'Date',
-                    font: { size: 10 } // Reduced font size
+                    font: { size: 12 },
                   },
                   ticks: {
                     maxRotation: 45,
                     minRotation: 45,
-                    font: { size: 8 } // Reduced font size
-                  }
+                    font: { size: 10 },
+                  },
                 },
                 y: {
                   title: {
                     display: true,
-                    text: 'Quantity',
-                    font: { size: 10 } // Reduced font size
+                    text: 'Quantité',
+                    font: { size: 12 },
                   },
                   beginAtZero: true,
                   ticks: {
-                    font: { size: 8 } // Reduced font size
-                  }
+                    font: { size: 10 },
+                    callback: value => value.toLocaleString('fr-FR'),
+                  },
                 },
               },
               plugins: {
                 legend: {
-                  position: 'bottom', // Moved to bottom for consistency with latest DoughnutChart
+                  position: 'bottom',
                   labels: {
-                    boxWidth: 8, // Reduced for consistency
-                    font: { size: 10 }, // Reduced font size
-                    padding: 5 // Reduced padding
-                  }
+                    boxWidth: 12,
+                    font: { size: 12 },
+                    padding: 10,
+                  },
                 },
                 tooltip: {
                   callbacks: {
-                    label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString()} units`
-                  }
+                    label: (ctx) => `${ctx.dataset.label} : ${ctx.parsed.y.toLocaleString('fr-FR')} unités`,
+                  },
                 },
               },
               interaction: {
                 intersect: false,
-                mode: 'index'
+                mode: 'index',
               },
               layout: {
-                padding: 5 // Reduced padding for consistency
-              }
+                padding: 10,
+              },
             }}
           />
         </div>

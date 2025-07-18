@@ -65,7 +65,7 @@ const routes = [
         path: '/app/rotations',
         component: Rotations,
         icon: <ArrowPathIcon className={iconClasses} />,
-        name: 'Calcul des rotations',
+        name: 'Calcul des KPI',
     },
     {
         path: '/app/explorer',
@@ -77,20 +77,20 @@ const routes = [
         path: '/app/rangementle',
         component: RangementLE,
         icon: <ArchiveBoxIcon className={iconClasses} />, // Remplacement par ArchiveBoxIcon
-        name: 'Guide au rangement LE',
+        name: 'Guide de rangement LE',
     },
     {
         path: '/app/rangement',
         component: Rangement,
         icon: <ArchiveBoxIcon className={iconClasses} />, // Remplacement par ArchiveBoxIcon
-        name: 'Guide au rangement global',
+        name: 'Guide de rangement global',
     },
 
     {
         path: '/app/charts',
         component: Charts,
         icon: <ChartBarIcon className={iconClasses} />,
-        name: 'Analytique',
+        name: 'Tableaux de bord',
     },
     {
         path: '',

@@ -2,227 +2,166 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 
-// Cache for total count
-let cachedTotalRecords = null;
-let cacheExpiry = null;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+// Configuration améliorée du cache
+let cachedTotalRecords = new Map();
+let cacheExpiry = new Map();
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 
-// Check if cache is valid
-const isCacheValid = () => {
-    return cachedTotalRecords !== null && cacheExpiry && Date.now() < cacheExpiry;
+// Fonction pour créer une clé de cache
+const getCacheKey = (search) => search ? `search_${search}` : 'all';
+
+// Vérifier si le cache est valide
+const isCacheValid = (key) => {
+    return cachedTotalRecords.has(key) && cacheExpiry.has(key) && Date.now() < cacheExpiry.get(key);
 };
 
-// Set cache
-const setCache = (totalRecords) => {
-    cachedTotalRecords = totalRecords;
-    cacheExpiry = Date.now() + CACHE_DURATION;
+// Définir le cache
+const setCache = (key, totalRecords) => {
+    cachedTotalRecords.set(key, totalRecords);
+    cacheExpiry.set(key, Date.now() + CACHE_DURATION);
 };
 
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
     let connection;
     const startTime = Date.now();
-    const { search, page = 1 } = req.query;
-    const limit = 25;
-    const offset = Math.max(0, (parseInt(page) - 1) * limit);
+    const { search, page = 1, limit = 10 } = req.query;
+    const pageLimit = Math.min(parseInt(limit), 50); // Limiter à 50 max
+    const offset = Math.max(0, (parseInt(page) - 1) * pageLimit);
+    const cacheKey = getCacheKey(search);
 
-    console.log(`[${new Date().toISOString()}] Starting query for page ${page}, search: ${search || 'none'}, limit: ${limit}, offset: ${offset}`);
+    console.log(`[${new Date().toISOString()}] Starting optimized query for page ${page}, search: ${search || 'none'}, limit: ${pageLimit}`);
 
-    // Set headers for SSE
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.flushHeaders();
+    try {
+        // Configuration de timeout pour la base de données
+        connection = await pool.getConnection();
+        await connection.query('SET SESSION wait_timeout = 300'); // 5 minutes
+        await connection.query('SET SESSION interactive_timeout = 300');
 
-    // Get connection
-    pool.getConnection((err, conn) => {
-        if (err) {
-            console.error(`[${new Date().toISOString()}] Connection Error:`, err.message, err.stack);
-            res.write(`data: ${JSON.stringify({ error: 'Failed to connect to database', details: err.message })}\n\n`);
-            res.end();
-            return;
-        }
-        connection = conn;
-        console.log(`[${new Date().toISOString()}] Database connection acquired`);
+        // Optimisations de session
+        await connection.query(`SET SESSION collation_connection = 'utf8mb4_unicode_ci'`);
+        await connection.query(`SET SESSION character_set_connection = 'utf8mb4'`);
+        await connection.query(`SET SESSION sql_mode = 'STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO'`);
 
-        // Set query timeout (30 seconds)
-        connection.query('SET SESSION wait_timeout = 30', (err) => {
-            if (err) {
-                console.error(`[${new Date().toISOString()}] Timeout Setup Error:`, err.message);
-                res.write(`data: ${JSON.stringify({ error: 'Failed to set query timeout', details: err.message })}\n\n`);
-                connection.release();
-                res.end();
-                return;
+        // Vérifier si on peut utiliser le cache pour le total
+        let totalRecords;
+        if (isCacheValid(cacheKey)) {
+            totalRecords = cachedTotalRecords.get(cacheKey);
+            console.log(`[${new Date().toISOString()}] Using cached total: ${totalRecords}`);
+        } else {
+            // Requête de comptage optimisée
+            let countQuery = `SELECT COUNT(DISTINCT article) as total FROM stock_ewm WHERE article IS NOT NULL AND article != ''`;
+            const countParams = [];
+
+            if (search) {
+                countQuery += ` AND (article = ? OR designation_article LIKE ?)`;
+                countParams.push(search.trim(), `%${search.trim()}%`);
             }
 
-            // Create temporary table to pre-aggregate stock_ewm
-            connection.query(`
-                CREATE TEMPORARY TABLE IF NOT EXISTS temp_stock_aggregation AS
-                SELECT 
-                    CAST(s.article AS CHAR) COLLATE utf8mb4_unicode_ci AS article_code,
-                    MAX(s.designation_article) AS description,
-                    MAX(s.emplacement) AS final_location,
-                    SUM(s.quantite) AS quantity,
-                    MAX(s.unite_qte_base) AS unit
-                FROM stock_ewm s
-                WHERE s.article IS NOT NULL
-                GROUP BY s.article
-            `, (err, result) => {
-                if (err) {
-                    console.error(`[${new Date().toISOString()}] Temporary Table Error:`, err.message, err.stack);
-                    res.write(`data: ${JSON.stringify({ error: 'Failed to create temporary table', details: err.message })}\n\n`);
-                    connection.release();
-                    res.end();
-                    return;
-                }
-                console.log(`[${new Date().toISOString()}] Temporary table created, rows affected: ${result.affectedRows}`);
+            const [countResult] = await connection.query(countQuery, countParams);
+            totalRecords = countResult[0].total;
+            setCache(cacheKey, totalRecords);
+            console.log(`[${new Date().toISOString()}] Fresh count: ${totalRecords}`);
+        }
 
-                // Main query
-                let stockQuery = `
-                    SELECT 
-                        t.article_code,
-                        t.description,
-                        t.final_location,
-                        t.quantity,
-                        t.unit,
-                        GROUP_CONCAT(DISTINCT m.Storage_Location SEPARATOR '\n') AS Storage_Location,
-                        MAX(m.Storage_location_Validé) AS Storage_location_Validé,
-                        MAX(m.BIN_SAP) AS BIN_SAP,
-                        MAX(m.bin) AS suitable_location,
-                        GROUP_CONCAT(DISTINCT 
-                            CONCAT(
-                                COALESCE(lt.Emplacement_cedant, 'N/A'), ' -> ',
-                                COALESCE(lt.Emplacement_prenant, 'N/A')
-                            ) SEPARATOR '\n'
-                        ) AS historical_locations
-                    FROM temp_stock_aggregation t
-                    INNER JOIN le_tache lt ON t.article_code = lt.Produit COLLATE utf8mb4_unicode_ci
-                    LEFT JOIN le_status ls ON lt.Document = ls.Document
-                    LEFT JOIN migration m ON t.article_code = CAST(m.SAP_Material AS CHAR) COLLATE utf8mb4_unicode_ci
-                `;
-                let stockCountQuery = `
-                    SELECT COUNT(DISTINCT t.article_code) AS total 
-                    FROM temp_stock_aggregation t
-                    INNER JOIN le_tache lt ON t.article_code = lt.Produit COLLATE utf8mb4_unicode_ci
-                    LEFT JOIN le_status ls ON lt.Document = ls.Document
-                `;
-                const stockParams = [];
-
-                if (search) {
-                    stockQuery += ` WHERE (t.article_code = ? OR t.description LIKE ?)`;
-                    stockCountQuery += ` WHERE (t.article_code = ? OR t.description LIKE ?)`;
-                    stockParams.push(search.trim(), `%${search.trim()}%`);
-                }
-                stockQuery += ` GROUP BY t.article_code ORDER BY t.article_code LIMIT ? OFFSET ?`;
-                stockParams.push(limit, offset);
-
-                console.log(`[${new Date().toISOString()}] Count query: ${stockCountQuery}, params: ${stockParams.slice(0, search ? 2 : 0)}`);
-
-                // Get total count
-                connection.query(stockCountQuery, stockParams.slice(0, search ? 2 : 0), (err, countResult) => {
-                    if (err) {
-                        console.error(`[${new Date().toISOString()}] Count Query Error:`, err.message, err.stack);
-                        res.write(`data: ${JSON.stringify({ error: 'Failed to fetch count', details: err.message })}\n\n`);
-                        connection.release();
-                        res.end();
-                        return;
-                    }
-
-                    let totalRecords = countResult[0].total;
-                    if (!search && isCacheValid()) {
-                        totalRecords = cachedTotalRecords;
-                        console.log(`[${new Date().toISOString()}] Using cached total: ${totalRecords}`);
-                    } else if (!search) {
-                        setCache(totalRecords);
-                    }
-                    console.log(`[${new Date().toISOString()}] Total records: ${totalRecords}`);
-
-                    if (totalRecords === 0) {
-                        console.log(`[${new Date().toISOString()}] No records found, sending empty response`);
-                        res.write(`data: ${JSON.stringify({
-                            data: [],
-                            totalRecords: 0,
-                            currentPage: parseInt(page),
-                            totalPages: 0,
-                            batch: true,
-                            complete: true
-                        })}\n\n`);
-                        connection.release();
-                        res.end();
-                        return;
-                    }
-
-                    console.log(`[${new Date().toISOString()}] Main query: ${stockQuery}, params: ${stockParams}`);
-
-                    // Stream query results
-                    const stream = connection.query(stockQuery, stockParams).stream();
-
-                    let results = [];
-                    let rowCount = 0;
-
-                    stream.on('data', (row) => {
-                        rowCount++;
-                        const formattedRow = {
-                            article_code: row.article_code || 'N/A',
-                            description: row.description || 'N/A',
-                            final_location: row.final_location || 'N/A',
-                            Storage_Location: row.Storage_Location || 'N/A',
-                            Storage_location_Validé: row.Storage_location_Validé || 'N/A',
-                            BIN_SAP: row.BIN_SAP || 'N/A',
-                            suitable_location: row.suitable_location || 'N/A',
-                            quantity: row.quantity != null ? Number(row.quantity).toFixed(3) : 'N/A',
-                            unit: row.unit || 'N/A',
-                            historical_locations: row.historical_locations || 'N/A'
-                        };
-                        results.push(formattedRow);
-                        console.log(`[${new Date().toISOString()}] Received row ${rowCount}:`, formattedRow);
-
-                        if (results.length >= limit || rowCount === totalRecords) {
-                            console.log(`[${new Date().toISOString()}] Sending batch of ${results.length} rows`);
-                            res.write(`data: ${JSON.stringify({
-                                data: results,
-                                totalRecords,
-                                currentPage: parseInt(page),
-                                totalPages: Math.ceil(totalRecords / limit) || 1,
-                                batch: true
-                            })}\n\n`);
-                            res.flush();
-                            results = [];
-                        }
-                    });
-
-                    stream.on('end', () => {
-                        console.log(`[${new Date().toISOString()}] Stream ended, total rows: ${rowCount}`);
-                        res.write(`data: ${JSON.stringify({ complete: true })}\n\n`);
-                        connection.release();
-                        res.end();
-                        console.log(`[${new Date().toISOString()}] Query Execution Time: ${Date.now() - startTime}ms`);
-                    });
-
-                    stream.on('error', (err) => {
-                        console.error(`[${new Date().toISOString()}] Stream Error:`, err.message, err.stack);
-                        res.write(`data: ${JSON.stringify({ error: 'Failed to stream data', details: err.message })}\n\n`);
-                        connection.release();
-                        res.end();
-                    });
-                });
+        if (totalRecords === 0) {
+            res.json({
+                data: [],
+                totalRecords: 0,
+                currentPage: parseInt(page),
+                totalPages: 0
             });
-        });
-    });
-});
-
-router.post('/reset-cache', (req, res) => {
-    pool.query('DROP TEMPORARY TABLE IF EXISTS temp_stock_aggregation', (err) => {
-        if (err) {
-            console.error(`[${new Date().toISOString()}] Reset Cache Error:`, err.message, err.stack);
-            res.status(500).json({ error: 'Failed to reset cache', details: err.message });
+            connection.release();
             return;
         }
-        cachedTotalRecords = null;
-        cacheExpiry = null;
-        res.json({ message: 'Cache and temporary table reset' });
-        console.log(`[${new Date().toISOString()}] Cache and temporary table reset`);
-    });
+
+        // Requête principale optimisée avec calcul de quantity_controlled
+        let mainQuery = `
+            SELECT STRAIGHT_JOIN
+                s.article AS article_code,
+                s.designation_article AS description,
+                s.emplacement AS final_location,
+                SUM(s.quantite) AS quantity_ewm,
+                s.unite_qte_base AS unit,
+                m.Storage_Location,
+                m.Storage_location_Validé,
+                m.BIN_SAP,
+                m.bin AS suitable_location,
+                lt.Emplacement_cedant AS emplacement_cedant,
+                lt.Emplacement_prenant AS emplacement_prenant,
+                lt.Document AS LE,
+                ls.Document AS LS,
+                COALESCE(m.Qté_validée_SAP, 0) + 
+                COALESCE((
+                    SELECT SUM(lt2.Qte_reelle_pren_UQB)
+                    FROM ls_tache lt2
+                    WHERE lt2.Produit = s.article
+                    AND lt2.Emplacement_prenant IS NOT NULL
+                    AND lt2.Emplacement_prenant != ''
+                ), 0) - 
+                COALESCE((
+                    SELECT SUM(lt2.Qte_reelle_pren_UQB)
+                    FROM ls_tache lt2
+                    WHERE lt2.Produit = s.article
+                    AND lt2.Emplacement_cedant IS NOT NULL
+                    AND lt2.Emplacement_cedant != ''
+                ), 0) AS quantity_controlled,
+                si.stock_utilisation_libre AS quantity_iam
+            FROM stock_ewm s
+            LEFT JOIN migration m ON s.article = m.SAP_Material
+            LEFT JOIN ls_tache lt ON s.article = lt.Produit
+            LEFT JOIN ls_status ls ON lt.Document = ls.Document
+            LEFT JOIN stock_iam si ON s.article = si.numero_article
+            WHERE s.article IS NOT NULL AND s.article != ''
+        `;
+
+        const params = [];
+
+        if (search) {
+            mainQuery += ` AND (s.article = ? OR s.designation_article LIKE ?)`;
+            params.push(search.trim(), `%${search.trim()}%`);
+        }
+
+        mainQuery += ` GROUP BY s.article ORDER BY s.article LIMIT ? OFFSET ?`;
+        params.push(pageLimit, offset);
+
+        console.log(`[${new Date().toISOString()}] Executing main query with ${params.length} parameters`);
+        const [results] = await connection.query(mainQuery, params);
+        console.log(`[${new Date().toISOString()}] Query completed, processing ${results.length} rows`);
+
+        // Formatage des résultats
+        const formattedData = results.map(row => ({
+            article_code: row.article_code || 'N/A',
+            description: row.description || 'N/A',
+            final_location: row.final_location || 'N/A',
+            Storage_Location: row.Storage_Location || 'N/A',
+            Storage_location_Validé: row.Storage_location_Validé || 'N/A',
+            BIN_SAP: row.BIN_SAP || 'N/A',
+            suitable_location: row.suitable_location || 'N/A',
+            quantity_ewm: row.quantity_ewm != null ? Number(row.quantity_ewm).toFixed(3) : 'N/A',
+            quantity_controlled: row.quantity_controlled != null ? Number(row.quantity_controlled).toFixed(3) : 'N/A',
+            quantity_iam: row.quantity_iam != null ? Number(row.quantity_iam).toFixed(3) : 'N/A',
+            unit: row.unit || 'N/A',
+            emplacement_cedant: row.emplacement_cedant || 'N/A',
+            emplacement_prenant: row.emplacement_prenant || 'N/A',
+            LE: row.LE || 'N/A',
+            LS: row.LS || 'N/A'
+        }));
+
+        res.json({
+            data: formattedData,
+            totalRecords,
+            currentPage: parseInt(page),
+            totalPages: Math.ceil(totalRecords / pageLimit) || 1
+        });
+
+        connection.release();
+        console.log(`[${new Date().toISOString()}] Total execution time: ${Date.now() - startTime}ms`);
+
+    } catch (err) {
+        console.error(`[${new Date().toISOString()}] Error:`, err.message, err.stack);
+        res.status(500).json({ error: 'Server error', details: err.message });
+        if (connection) connection.release();
+    }
 });
 
 module.exports = router;

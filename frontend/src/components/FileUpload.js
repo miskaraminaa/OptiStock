@@ -2,6 +2,10 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux'; // Importation ajoutée
+
+import { setPageTitle } from '../features/common/headerSlice';
+import TitleCard from './Cards/TitleCard';
 
 const FileUpload = () => {
     const [importedFiles, setImportedFiles] = useState([]);
@@ -9,6 +13,12 @@ const FileUpload = () => {
     const [uploadStatus, setUploadStatus] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const navigate = useNavigate();
+    const dispatch = useDispatch(); // Initialisation de useDispatch
+
+    // Définir le titre de la page au montage
+    useEffect(() => {
+        dispatch(setPageTitle({ title: "Téléversement Fichiers SAP" }));
+    }, [dispatch]);
 
     // Définir les types de fichiers avec des libellés descriptifs
     const fileTypes = [
@@ -128,7 +138,7 @@ const FileUpload = () => {
 
     return (
         <div className="max-w-4xl mx-auto p-6 bg-gray-100 min-h-screen">
-            <h1 className="text-2xl font-bold mb-6 text-center">Téléversement de Fichiers OptiStock</h1>
+            <h1 className="text-2xl font-bold mb-6 text-center">Téléversement Fichiers SAP</h1>
 
             <div className="bg-white p-6 rounded-lg shadow-md mb-6">
                 <div className="mb-4">
