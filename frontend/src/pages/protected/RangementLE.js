@@ -94,18 +94,7 @@ const RangementLE = () => {
         fetchData(page, searchTerm);
     };
 
-    const handleResetCache = async () => {
-        try {
-            const response = await fetch(`${API_URL}/rangement-le/reset-cache`, { method: 'POST' });
-            if (!response.ok) throw new Error('Failed to reset cache');
-            setData([]);
-            setPage(1);
-            setError(null);
-            fetchData(page, searchTerm);
-        } catch (err) {
-            setError('Erreur lors de la réinitialisation du cache');
-        }
-    };
+
 
     const handleSort = (key) => {
         let direction = 'asc';
@@ -182,13 +171,7 @@ const RangementLE = () => {
                         {totalRecords.toLocaleString()} articles
                     </span>
                     <span className="text-gray-400">Page {page} / {totalPages}</span>
-                    <button
-                        onClick={handleResetCache}
-                        className="px-4 py-2 bg-gray-600 text-white rounded-lg shadow hover:bg-gray-700 transition duration-200 flex items-center text-sm"
-                        aria-label="Réinitialiser le cache"
-                    >
-                        <FaRedo className="mr-2" /> Réinitialiser Cache
-                    </button>
+                    
                 </div>
             </div>
 

@@ -4,9 +4,40 @@ const db = require('../config/db');
 const multer = require('multer');
 const XLSX = require('xlsx');
 const cors = require('cors');
-const path = require('path');
-const { excelDateToJSDate } = require('../utils/excelHelpers');
 
+
+// routes/uploads.js - Version corrigée pour l'exe
+const path = require('path');
+
+// Solution pour les fichiers exe compilés
+let excelHelpers;
+try {
+    // Essayer le chemin relatif normal
+    excelHelpers = require('../utils/excelHelpers');
+} catch (error) {
+    try {
+        // Essayer avec un chemin absolu pour l'exe
+        const helpersPath = path.join(process.cwd(), 'utils', 'excelHelpers');
+        excelHelpers = require(helpersPath);
+    } catch (error2) {
+        try {
+            // Essayer avec process.execPath pour l'exe
+            const helpersPath = path.join(path.dirname(process.execPath), 'utils', 'excelHelpers');
+            excelHelpers = require(helpersPath);
+        } catch (error3) {
+            // Fallback : définir la fonction directement
+            console.warn('Impossible de charger excelHelpers, utilisation de la fonction intégrée');
+            excelHelpers = {
+                excelDateToJSDate: function (serial) {
+                    const utc_days = Math.floor(serial - 25569);
+                    const utc_value = utc_days * 86400;
+                    const date_info = new Date(utc_value * 1000);
+                    return new Date(date_info.getUTCFullYear(), date_info.getUTCMonth(), date_info.getUTCDate());
+                }
+            };
+        }
+    }
+}
 // Configure CORS
 router.use(cors({ origin: 'http://localhost:3000', credentials: true }));
 

@@ -15,10 +15,11 @@ function Welcome() {
   const handleStartNow = () => {
     dispatch(
       showNotification({
-        message: 'Navigation vers le tableau de bord',
+        message: 'Navigation vers Téléversement Fichiers',
         status: 1,
       })
     );
+    
   };
 
   return (

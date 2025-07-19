@@ -61,7 +61,7 @@ function WelcomeFeatures() {
                 <p className="text-base sm:text-lg text-gray-600 mt-4 max-w-3xl mx-auto">
                     Découvrez une plateforme conçue pour simplifier les opérations de stock avec des analyses approfondies.
                 </p>
-                <Link to="/app.">
+                <Link to="/app/dashboard">
                     <button className="mt-6 px-6 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-all duration-200 text-sm font-medium hover:scale-105">
                         Commencer maintenant
                     </button>
