@@ -10,20 +10,24 @@ console.log('controleRouter loaded');
 // Endpoint for /controle/data
 router.post('/data', async (req, res) => {
     console.log('Handling POST /data');
-    const { nOt, bs, typeSortie } = req.body;
+    const { nOt, bs, typeSortie, dateLivraison } = req.body;
     try {
         const query = `
-            SELECT n_ot, bs, le, commande_achat, nature_sortie, type_sortie, n_reservation, magasin, local, demandeur, preparateur, responsable_local, COALESCE(articles, '[]') as articles
+            SELECT n_ot, bs, le, commande_achat, nature_sortie, type_sortie, n_reservation, magasin, local, 
+                   demandeur, preparateur, responsable_local, COALESCE(articles, '[]') as articles, date_livraison
             FROM controle_livraisons
             WHERE (? IS NULL OR n_ot LIKE CONCAT('%', ?, '%'))
             AND (? IS NULL OR bs LIKE CONCAT('%', ?, '%'))
             AND (? IS NULL OR type_sortie = ?)
+            AND (? IS NULL OR DATE(date_livraison) = ? OR date_livraison IS NULL)
+            ORDER BY date_livraison DESC, n_ot ASC
         `;
-        const params = [nOt || null, nOt || null, bs || null, bs || null, typeSortie || null, typeSortie || null];
+        const params = [nOt || null, nOt || null, bs || null, bs || null, typeSortie || null, typeSortie || null, dateLivraison || null, dateLivraison || null];
         const [rows] = await pool.execute(query, params);
         const sanitizedRows = rows.map(row => ({
             ...row,
-            articles: typeof row.articles === 'string' ? JSON.parse(row.articles || '[]') : (row.articles || [])
+            articles: typeof row.articles === 'string' ? JSON.parse(row.articles || '[]') : (row.articles || []),
+            date_livraison: row.date_livraison ? moment(row.date_livraison).format('YYYY-MM-DD') : null
         }));
         res.json(sanitizedRows);
     } catch (err) {
@@ -37,21 +41,21 @@ router.get('/mb51/articles', async (req, res) => {
     console.log('Handling GET /mb51/articles');
     try {
         const [rows] = await pool.execute(
-            `SELECT 
+            `SELECT
                 article,
                 designation_article,
                 magasin,
-                stock_initial,
-                sorties,
-                entrees,
-                quantite_iam,
-                (stock_initial + entrees - sorties) AS stock_quantite_controle,
-                CASE 
-                    WHEN ROUND(stock_initial + entrees - sorties, 3) = ROUND(quantite_iam, 3) THEN 'Validé'
+                CASE WHEN stock_initial = 0 THEN 'N/V' ELSE stock_initial END AS stock_initial,
+                CASE WHEN sorties = 0 THEN 'N/V' ELSE sorties END AS sorties,
+                CASE WHEN entrees = 0 THEN 'N/V' ELSE entrees END AS entrees,
+                CASE WHEN quantite_iam = 0 THEN 'N/V' ELSE quantite_iam END AS quantite_iam,
+                (stock_initial_calc + entrees_calc - sorties_calc) AS stock_quantite_controle,
+                CASE
+                    WHEN ROUND(stock_initial_calc + entrees_calc - sorties_calc, 2) = ROUND(quantite_iam_calc, 2) THEN 'Validé'
                     ELSE '-'
                 END AS validation
             FROM (
-                SELECT 
+                SELECT
                     le.Produit AS article,
                     le.Designation_produit AS designation_article,
                     si.magasin,
@@ -62,34 +66,114 @@ router.get('/mb51/articles', async (req, res) => {
                         AND mig.Qté_validée_SAP IS NOT NULL
                     ), 0) AS stock_initial,
                     COALESCE((
-                        SELECT SUM(le2.Qte_reelle_pren_UQA)
-                        FROM le_tache le2
-                        WHERE le2.Produit = le.Produit
-                        AND le2.Qte_reelle_pren_UQA IS NOT NULL
+                        SELECT SUM(mig.Qté_validée_SAP)
+                        FROM migration mig
+                        WHERE mig.SAP_Material = le.Produit
+                        AND mig.Qté_validée_SAP IS NOT NULL
+                    ), 0) AS stock_initial_calc,
+                    COALESCE((
+                        SELECT SUM(ls.Qte_reelle_pren_UQA)
+                        FROM ls_tache ls
+                        WHERE ls.Produit = CAST(le.Produit AS SIGNED)
+                        AND ls.Qte_reelle_pren_UQA IS NOT NULL
                     ), 0) AS sorties,
                     COALESCE((
-                        SELECT SUM(le3.Qte_theo_ced_UQA) + COALESCE((
-                            SELECT SUM(ls2.Qte_reelle_pren_UQA)
-                            FROM ls_tache ls2
-                            WHERE ls2.Produit = le.Produit
-                            AND ls2.Qte_reelle_pren_UQA IS NOT NULL
-                        ), 0)
-                        FROM le_tache le3
-                        WHERE le3.Produit = le.Produit
-                        AND le3.Qte_theo_ced_UQA IS NOT NULL
+                        SELECT SUM(ls.Qte_reelle_pren_UQA)
+                        FROM ls_tache ls
+                        WHERE ls.Produit = CAST(le.Produit AS SIGNED)
+                        AND ls.Qte_reelle_pren_UQA IS NOT NULL
+                    ), 0) AS sorties_calc,
+                    COALESCE((
+                        SELECT SUM(le2.Qte_theo_ced_UQA)
+                        FROM le_tache le2
+                        WHERE le2.Produit = le.Produit
+                        AND le2.Qte_theo_ced_UQA IS NOT NULL
                     ), 0) AS entrees,
+                    COALESCE((
+                        SELECT SUM(le2.Qte_theo_ced_UQA)
+                        FROM le_tache le2
+                        WHERE le2.Produit = le.Produit
+                        AND le2.Qte_theo_ced_UQA IS NOT NULL
+                    ), 0) AS entrees_calc,
                     COALESCE((
                         SELECT SUM(stock_utilisation_libre)
                         FROM stock_iam si2
                         WHERE si2.numero_article = le.Produit
                         AND si2.magasin = si.magasin
                         AND si2.stock_utilisation_libre IS NOT NULL
-                    ), 0) AS quantite_iam
+                    ), 0) AS quantite_iam,
+                    COALESCE((
+                        SELECT SUM(stock_utilisation_libre)
+                        FROM stock_iam si2
+                        WHERE si2.numero_article = le.Produit
+                        AND si2.magasin = si.magasin
+                        AND si2.stock_utilisation_libre IS NOT NULL
+                    ), 0) AS quantite_iam_calc
                 FROM le_tache le
+                LEFT JOIN ls_tache ls ON CAST(le.Produit AS SIGNED) = ls.Produit
                 LEFT JOIN stock_iam si ON le.Produit = si.numero_article
                 GROUP BY le.Produit, le.Designation_produit, si.magasin
+                UNION
+                SELECT
+                    CAST(ls.Produit AS CHAR) AS article,
+                    ls.Designation_produit AS designation_article,
+                    si.magasin,
+                    COALESCE((
+                        SELECT SUM(mig.Qté_validée_SAP)
+                        FROM migration mig
+                        WHERE mig.SAP_Material = CAST(ls.Produit AS CHAR)
+                        AND mig.Qté_validée_SAP IS NOT NULL
+                    ), 0) AS stock_initial,
+                    COALESCE((
+                        SELECT SUM(mig.Qté_validée_SAP)
+                        FROM migration mig
+                        WHERE mig.SAP_Material = CAST(ls.Produit AS CHAR)
+                        AND mig.Qté_validée_SAP IS NOT NULL
+                    ), 0) AS stock_initial_calc,
+                    COALESCE((
+                        SELECT SUM(ls2.Qte_reelle_pren_UQA)
+                        FROM ls_tache ls2
+                        WHERE ls2.Produit = ls.Produit
+                        AND ls2.Qte_reelle_pren_UQA IS NOT NULL
+                    ), 0) AS sorties,
+                    COALESCE((
+                        SELECT SUM(ls2.Qte_reelle_pren_UQA)
+                        FROM ls_tache ls2
+                        WHERE ls2.Produit = ls.Produit
+                        AND ls2.Qte_reelle_pren_UQA IS NOT NULL
+                    ), 0) AS sorties_calc,
+                    COALESCE((
+                        SELECT SUM(le2.Qte_theo_ced_UQA)
+                        FROM le_tache le2
+                        WHERE le2.Produit = CAST(ls.Produit AS CHAR)
+                        AND le2.Qte_theo_ced_UQA IS NOT NULL
+                    ), 0) AS entrees,
+                    COALESCE((
+                        SELECT SUM(le2.Qte_theo_ced_UQA)
+                        FROM le_tache le2
+                        WHERE le2.Produit = CAST(ls.Produit AS CHAR)
+                        AND le2.Qte_theo_ced_UQA IS NOT NULL
+                    ), 0) AS entrees_calc,
+                    COALESCE((
+                        SELECT SUM(stock_utilisation_libre)
+                        FROM stock_iam si2
+                        WHERE si2.numero_article = CAST(ls.Produit AS CHAR)
+                        AND si2.magasin = si.magasin
+                        AND si2.stock_utilisation_libre IS NOT NULL
+                    ), 0) AS quantite_iam,
+                    COALESCE((
+                        SELECT SUM(stock_utilisation_libre)
+                        FROM stock_iam si2
+                        WHERE si2.numero_article = CAST(ls.Produit AS CHAR)
+                        AND si2.magasin = si.magasin
+                        AND si2.stock_utilisation_libre IS NOT NULL
+                    ), 0) AS quantite_iam_calc
+                FROM ls_tache ls
+                LEFT JOIN le_tache le ON ls.Produit = CAST(le.Produit AS SIGNED)
+                LEFT JOIN stock_iam si ON CAST(ls.Produit AS CHAR) = si.numero_article
+                WHERE le.Produit IS NULL
+                GROUP BY ls.Produit, ls.Designation_produit, si.magasin
             ) AS subquery
-            WHERE (stock_initial + entrees - sorties) > 0
             ORDER BY article ASC, magasin ASC`
         );
         res.json(rows);
@@ -108,7 +192,7 @@ router.post('/update', async (req, res) => {
         if (action === 'add') {
             const {
                 n_ot, bs, le, commande_achat, nature_sortie, type_sortie,
-                n_reservation, magasin, local, demandeur, preparateur, responsable_local, articles
+                n_reservation, magasin, local, demandeur, preparateur, responsable_local, articles, date_livraison
             } = data;
 
             // Generate default values based on type_sortie
@@ -130,12 +214,15 @@ router.post('/update', async (req, res) => {
             if (type_sortie === 'STO' && !defaultCommande_achat) {
                 return res.status(400).json({ error: "La commande d'achat est requise pour un type de sortie STO." });
             }
+            if (!date_livraison) {
+                return res.status(400).json({ error: "La date de livraison est requise." });
+            }
 
-            // Fetch available stock data (aggregate across all stores)
+            // Fetch available stock data
             const [stockRows] = await pool.execute(
                 `SELECT 
                     article,
-                    SUM(stock_initial + entrees - sorties) AS stock_quantite_controle
+                    COALESCE(SUM(stock_initial + entrees - sorties), 0) AS stock_quantite_controle
                 FROM (
                     SELECT 
                         le.Produit AS article,
@@ -146,30 +233,70 @@ router.post('/update', async (req, res) => {
                             AND mig.Qté_validée_SAP IS NOT NULL
                         ), 0) AS stock_initial,
                         COALESCE((
-                            SELECT SUM(le2.Qte_reelle_pren_UQA)
-                            FROM le_tache le2
-                            WHERE le2.Produit = le.Produit
-                            AND le2.Qte_reelle_pren_UQA IS NOT NULL
+                            SELECT SUM(ls.Qte_reelle_pren_UQA)
+                            FROM ls_tache ls
+                            WHERE ls.Produit = le.Produit
+                            AND ls.Qte_reelle_pren_UQA IS NOT NULL
                         ), 0) AS sorties,
                         COALESCE((
-                            SELECT SUM(le3.Qte_theo_ced_UQA) + COALESCE((
-                                SELECT SUM(ls2.Qte_reelle_pren_UQA)
-                                FROM ls_tache ls2
-                                WHERE ls2.Produit = le.Produit
-                                AND ls2.Qte_reelle_pren_UQA IS NOT NULL
-                            ), 0)
-                            FROM le_tache le3
-                            WHERE le3.Produit = le.Produit
-                            AND le3.Qte_theo_ced_UQA IS NOT NULL
+                            SELECT SUM(le2.Qte_theo_ced_UQA)
+                            FROM le_tache le2
+                            WHERE le2.Produit = le.Produit
+                            AND le2.Qte_theo_ced_UQA IS NOT NULL
                         ), 0) AS entrees
                     FROM le_tache le
+                    WHERE le.Produit IN (${articles.map(() => '?').join(',')})
                     GROUP BY le.Produit
+                    UNION
+                    SELECT 
+                        CAST(ls.Produit AS CHAR) AS article,
+                        COALESCE((
+                            SELECT SUM(mig.Qté_validée_SAP)
+                            FROM migration mig
+                            WHERE mig.SAP_Material = CAST(ls.Produit AS CHAR)
+                            AND mig.Qté_validée_SAP IS NOT NULL
+                        ), 0) AS stock_initial,
+                        COALESCE((
+                            SELECT SUM(ls2.Qte_reelle_pren_UQA)
+                            FROM ls_tache ls2
+                            WHERE ls2.Produit = ls.Produit
+                            AND ls2.Qte_reelle_pren_UQA IS NOT NULL
+                        ), 0) AS sorties,
+                        COALESCE((
+                            SELECT SUM(le2.Qte_theo_ced_UQA)
+                            FROM le_tache le2
+                            WHERE le2.Produit = CAST(ls.Produit AS CHAR)
+                            AND le2.Qte_theo_ced_UQA IS NOT NULL
+                        ), 0) AS entrees
+                    FROM ls_tache ls
+                    WHERE ls.Produit IN (${articles.map(() => '?').join(',')})
+                    GROUP BY ls.Produit
+                    UNION
+                    SELECT 
+                        mig.SAP_Material AS article,
+                        COALESCE(SUM(mig.Qté_validée_SAP), 0) AS stock_initial,
+                        COALESCE((
+                            SELECT SUM(ls2.Qte_reelle_pren_UQA)
+                            FROM ls_tache ls2
+                            WHERE ls2.Produit = mig.SAP_Material
+                            AND ls2.Qte_reelle_pren_UQA IS NOT NULL
+                        ), 0) AS sorties,
+                        COALESCE((
+                            SELECT SUM(le2.Qte_theo_ced_UQA)
+                            FROM le_tache le2
+                            WHERE le2.Produit = mig.SAP_Material
+                            AND le2.Qte_theo_ced_UQA IS NOT NULL
+                        ), 0) AS entrees
+                    FROM migration mig
+                    WHERE mig.SAP_Material IN (${articles.map(() => '?').join(',')})
+                    AND mig.Qté_validée_SAP IS NOT NULL
+                    GROUP BY mig.SAP_Material
                 ) AS stock_data
-                WHERE (stock_initial + entrees - sorties) > 0
-                GROUP BY article`
+                GROUP BY article`,
+                [...articles.map(a => a.article), ...articles.map(a => a.article), ...articles.map(a => a.article)]
             );
 
-            const stockMap = new Map(stockRows.map(row => [row.article, row.stock_quantite_controle]));
+            const stockMap = new Map(stockRows.map(row => [row.article, parseFloat(row.stock_quantite_controle) || 0]));
 
             // Validate articles
             if (!articles || !Array.isArray(articles) || articles.length === 0) {
@@ -178,15 +305,16 @@ router.post('/update', async (req, res) => {
             const validationErrors = [];
             const updatedArticles = articles.map(article => {
                 const availableQuantity = stockMap.get(article.article) || 0;
+                const requestedQuantity = parseFloat(article.quantity) || 0;
                 if (availableQuantity <= 0) {
                     validationErrors.push(`L'article ${article.article} n'a pas de quantité positive disponible.`);
                 }
-                if (article.quantity > availableQuantity) {
-                    validationErrors.push(`La quantité saisie (${article.quantity}) pour l'article ${article.article} dépasse la quantité disponible (${availableQuantity}).`);
+                if (requestedQuantity > availableQuantity) {
+                    validationErrors.push(`La quantité saisie (${requestedQuantity}) pour l'article ${article.article} dépasse la quantité disponible (${availableQuantity}).`);
                 }
                 return {
                     ...article,
-                    quantite_mise_a_jour: availableQuantity - article.quantity
+                    quantite_mise_a_jour: availableQuantity - requestedQuantity
                 };
             });
 
@@ -197,8 +325,8 @@ router.post('/update', async (req, res) => {
             const query = `
                 INSERT INTO controle_livraisons (
                     n_ot, bs, le, commande_achat, nature_sortie, type_sortie,
-                    n_reservation, magasin, local, demandeur, preparateur, responsable_local, articles
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    n_reservation, magasin, local, demandeur, preparateur, responsable_local, articles, date_livraison
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             const params = [
                 defaultN_ot,
@@ -213,26 +341,65 @@ router.post('/update', async (req, res) => {
                 demandeur || null,
                 preparateur || null,
                 responsable_local || null,
-                JSON.stringify(updatedArticles || [])
+                JSON.stringify(updatedArticles || []),
+                date_livraison || null
             ];
             await pool.execute(query, params);
             res.json({ success: true, message: 'Livraison ajoutée avec succès', articles: updatedArticles });
         } else if (action === 'remove') {
-            const nOts = data;
-            if (!Array.isArray(nOts) || nOts.length === 0) {
-                return res.status(400).json({ error: 'Liste de N° OT vide ou invalide' });
+            if (!Array.isArray(data) || data.length === 0) {
+                throw new Error('Liste des identifiants vide ou invalide');
             }
-            const placeholders = nOts.map(() => '?').join(',');
-            const query = `DELETE FROM controle_livraisons WHERE n_ot IN (${placeholders})`;
-            await pool.execute(query, nOts);
-            res.json({ success: true, message: 'Livraisons supprimées avec succès' });
+
+            await pool.query('START TRANSACTION');
+            try {
+                for (const record of data) {
+                    const { type_sortie, identifier } = record;
+                    if (!type_sortie || !identifier) {
+                        throw new Error('Type de sortie ou identifiant manquant');
+                    }
+
+                    let query;
+                    let param;
+                    switch (type_sortie) {
+                        case 'OT':
+                            query = `DELETE FROM controle_livraisons WHERE type_sortie = 'OT' AND n_ot = ?`;
+                            param = identifier;
+                            break;
+                        case 'BS':
+                            query = `DELETE FROM controle_livraisons WHERE type_sortie = 'BS' AND bs = ?`;
+                            param = identifier;
+                            break;
+                        case 'LE':
+                            query = `DELETE FROM controle_livraisons WHERE type_sortie = 'LE' AND le = ?`;
+                            param = identifier;
+                            break;
+                        case 'STO':
+                            query = `DELETE FROM controle_livraisons WHERE type_sortie = 'STO' AND commande_achat = ?`;
+                            param = identifier;
+                            break;
+                        default:
+                            throw new Error(`Type de sortie non reconnu: ${type_sortie}`);
+                    }
+
+                    const [result] = await pool.execute(query, [param]);
+                    if (result.affectedRows === 0) {
+                        console.warn(`Aucun enregistrement trouvé pour type_sortie: ${type_sortie}, identifiant: ${param}`);
+                    }
+                }
+
+                await pool.query('COMMIT');
+                res.json({ success: true, message: 'Livraisons supprimées avec succès' });
+            } catch (err) {
+                await pool.query('ROLLBACK');
+                throw err;
+            }
         } else {
-            res.status(400).json({ error: 'Action non reconnue' });
+            throw new Error('Action non reconnue. Utilisez "add" ou "remove".');
         }
     } catch (err) {
         console.error('Erreur lors de la mise à jour:', err.stack);
         res.status(500).json({ error: 'Erreur serveur lors de la mise à jour', details: err.message });
     }
 });
-
 module.exports = router;

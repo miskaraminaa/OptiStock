@@ -4,7 +4,7 @@ import { ClipLoader } from "react-spinners";
 import * as XLSX from "xlsx";
 import { useDispatch } from "react-redux"; // Importation ajoutée
 import { setPageTitle } from '../../features/common/headerSlice';
-import TitleCard from '../../components/Cards/TitleCard';
+
 const Dimensions = () => {
     const [ids, setIds] = useState([]);
     const [dimensions, setDimensions] = useState([]);
