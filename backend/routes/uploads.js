@@ -1069,6 +1069,60 @@ router.get('/files', async (req, res) => {
     }
 });
 
+// Ajouter cette route avant les autres routes
+router.delete('/files/:id', async (req, res) => {
+    console.log(`Starting DELETE /uploads/files/${req.params.id}`);
+    const fileId = req.params.id;
+
+    try {
+        // Vérifier si le fichier existe
+        const [fileRows] = await db.query(
+            'SELECT id, fichier_name, type FROM imported_file WHERE id = ?',
+            [fileId]
+        );
+        if (fileRows.length === 0) {
+            console.log(`File with ID ${fileId} not found`);
+            return res.status(404).json({ message: 'File not found' });
+        }
+
+        const file = fileRows[0];
+        const tableName = fileTypeToTable[file.type];
+
+        if (!tableName) {
+            console.error(`No table mapping for type: ${file.type}`);
+            return res.status(400).json({ message: 'Invalid file type for deletion' });
+        }
+
+        // Démarrer une transaction pour assurer la cohérence
+        await db.query('START TRANSACTION');
+
+        // Supprimer les données associées dans la table correspondante
+        await db.query(`DELETE FROM \`${tableName}\` WHERE name_file = ?`, [file.fichier_name]);
+
+        // Supprimer l'entrée du fichier dans imported_file
+        await db.query('DELETE FROM imported_file WHERE id = ?', [fileId]);
+
+        // Valider la transaction
+        await db.query('COMMIT');
+
+        console.log(`Successfully deleted file ${file.fichier_name} and associated data from ${tableName}`);
+        return res.status(200).json({
+            message: 'File and associated data deleted successfully',
+            fileName: file.fichier_name,
+            tableName: tableName
+        });
+    } catch (err) {
+        await db.query('ROLLBACK');
+        console.error(`Error in DELETE /uploads/files/${fileId}:`, err);
+        return res.status(500).json({
+            message: 'Error deleting file and associated data',
+            error: err.message,
+            code: err.code,
+            sql: err.sql
+        });
+    }
+});
+
 // POST route pour exporter stock_ewm vers Excel
 router.post('/export/stock_ewm', async (req, res) => {
     console.log('Starting POST /uploads/export/stock_ewm');

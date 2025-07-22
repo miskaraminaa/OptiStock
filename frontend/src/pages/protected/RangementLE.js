@@ -31,7 +31,8 @@ const RangementLE = () => {
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [totalRecords, setTotalRecords] = useState(0);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState(''); // Pour la recherche par code ou désignation
+    const [leSearch, setLeSearch] = useState(''); // Pour la recherche par LE
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
@@ -43,7 +44,7 @@ const RangementLE = () => {
     }, [dispatch]);
 
     const fetchData = useCallback(
-        async (page, search, retryCount = 0) => {
+        async (page, search, leSearch, retryCount = 0) => {
             const maxRetries = 3;
             const timeoutDuration = 120000;
             setLoading(true);
@@ -52,7 +53,7 @@ const RangementLE = () => {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
                 const response = await fetch(
-                    `${API_URL}/rangement-le?page=${page}&limit=${limit}${search ? `&search=${encodeURIComponent(search)}` : ''}`,
+                    `${API_URL}/rangement-le?page=${page}&limit=${limit}${search ? `&search=${encodeURIComponent(search)}` : ''}${leSearch ? `&leSearch=${encodeURIComponent(leSearch)}` : ''}`,
                     { signal: controller.signal, headers: { 'Content-Type': 'application/json' } }
                 );
                 clearTimeout(timeoutId);
@@ -64,7 +65,7 @@ const RangementLE = () => {
                 setTotalPages(result.totalPages || Math.ceil(result.totalRecords / limit));
             } catch (err) {
                 if (err.name === 'AbortError' && retryCount < maxRetries) {
-                    setTimeout(() => fetchData(page, search, retryCount + 1), 1000 * (retryCount + 1));
+                    setTimeout(() => fetchData(page, search, leSearch, retryCount + 1), 1000 * (retryCount + 1));
                     return;
                 }
                 setError(`Erreur lors du chargement des données: ${err.message}`);
@@ -78,12 +79,17 @@ const RangementLE = () => {
     const debouncedFetchData = useMemo(() => debounce(fetchData, 300), [fetchData]);
 
     useEffect(() => {
-        debouncedFetchData(page, searchTerm);
+        debouncedFetchData(page, searchTerm, leSearch);
         return () => debouncedFetchData.cancel();
-    }, [page, searchTerm, debouncedFetchData]);
+    }, [page, searchTerm, leSearch, debouncedFetchData]);
 
     const handleSearch = useCallback((e) => {
         setSearchTerm(e.target.value.trim());
+        setPage(1);
+    }, []);
+
+    const handleLeSearch = useCallback((e) => {
+        setLeSearch(e.target.value.trim());
         setPage(1);
     }, []);
 
@@ -91,10 +97,8 @@ const RangementLE = () => {
         setData([]);
         setPage(1);
         setError(null);
-        fetchData(page, searchTerm);
+        fetchData(page, searchTerm, leSearch);
     };
-
-
 
     const handleSort = (key) => {
         let direction = 'asc';
@@ -165,13 +169,23 @@ const RangementLE = () => {
                         aria-label="Rechercher par code article ou désignation"
                     />
                 </div>
+                <div className="relative w-full sm:flex-1 max-w-md">
+                    <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
+                    <input
+                        type="text"
+                        onChange={handleLeSearch}
+                        placeholder="Rechercher par LE"
+                        value={leSearch}
+                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 text-sm"
+                        aria-label="Rechercher par LE"
+                    />
+                </div>
                 <div className="flex items-center gap-4 text-sm text-gray-600">
                     <span className="flex items-center">
                         <FaBoxes className="mr-1" />
                         {totalRecords.toLocaleString()} articles
                     </span>
                     <span className="text-gray-400">Page {page} / {totalPages}</span>
-                    
                 </div>
             </div>
 
@@ -243,6 +257,9 @@ const RangementLE = () => {
                                             role="button"
                                             aria-sort={sortConfig.key === key ? sortConfig.direction : 'none'}
                                             scope="col"
+                                            style={{
+                                                width: ['emplacement_cedant', 'emplacement_prenant', 'final_location', 'suitable_location', 'BIN_SAP'].includes(key) ? '150px' : 'auto',
+                                            }}
                                         >
                                             {label} {sortConfig.key === key && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                         </th>
@@ -255,18 +272,18 @@ const RangementLE = () => {
                                     return (
                                         <tr key={`${row.article_code}-${index}`} className="hover:bg-gray-50 transition duration-150">
                                             <td className="px-4 py-3 text-gray-900 font-medium text-sm">{row.article_code}</td>
-                                            <td className="px-4 py-3 text-gray-800 text-sm max-w-[16rem]">
+                                            <td className="px-4 py-3 text-gray-800 text-sm max-w-[200px]">
                                                 <div className="truncate" title={row.description}>{row.description}</div>
                                             </td>
-                                            <td className="px-4 py-3 text-gray-800 text-sm max-w-[16rem] whitespace-pre-wrap">{row.emplacement_cedant}</td>
-                                            <td className="px-4 py-3 text-gray-800 text-sm max-w-[16rem] whitespace-pre-wrap">{row.emplacement_prenant}</td>
-                                            <td className="px-4 py-3 text-gray-800 text-sm">
+                                            <td className="px-6 py-4 text-gray-800 text-sm min-w-[200px] whitespace-pre-wrap">{row.emplacement_cedant}</td>
+                                            <td className="px-6 py-4 text-gray-800 text-sm min-w-[200px] whitespace-pre-wrap">{row.emplacement_prenant}</td>
+                                            <td className="px-6 py-4 text-gray-800 text-sm min-w-[200px]">
                                                 <div className="flex items-center">
                                                     <FaMapMarkerAlt className="mr-1 text-blue-500" />
                                                     {row.final_location}
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-3 text-gray-800 text-sm">
+                                            <td className="px-6 py-4 text-gray-800 text-sm min-w-[200px]">
                                                 <div className="flex items-center">
                                                     <div className={`w-2 h-2 rounded-full mr-2 ${locationStatus.color.split(' ')[0]}`}></div>
                                                     {row.suitable_location}
@@ -274,7 +291,7 @@ const RangementLE = () => {
                                             </td>
                                             <td className="px-4 py-3 text-gray-800 text-sm whitespace-pre-wrap">{row.Storage_Location}</td>
                                             <td className="px-4 py-3 text-gray-800 text-sm">{row.Storage_location_Validé}</td>
-                                            <td className="px-4 py-3 text-gray-800 text-sm">{row.BIN_SAP}</td>
+                                            <td className="px-6 py-4 text-gray-800 text-sm min-w-[200px]">{row.BIN_SAP}</td>
                                             <td className="px-4 py-3 text-gray-800 text-sm font-medium">{row.quantity_ewm}</td>
                                             <td className="px-4 py-3 text-gray-800 text-sm font-medium">{row.quantity_controlled}</td>
                                             <td className="px-4 py-3 text-gray-800 text-sm font-medium">{row.quantity_iam}</td>
@@ -307,8 +324,8 @@ const RangementLE = () => {
                                 onClick={() => typeof pageNum === 'number' && setPage(pageNum)}
                                 disabled={pageNum === '...' || pageNum === page}
                                 className={`px-3 py-1 rounded-md text-sm transition duration-200 ${pageNum === page
-                                        ? 'bg-blue-600 text-white'
-                                        : pageNum === '...' ? 'text-gray-400 cursor-default' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                    ? 'bg-blue-600 text-white'
+                                    : pageNum === '...' ? 'text-gray-400 cursor-default' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                                     }`}
                                 aria-label={pageNum === '...' ? 'Ellipsis' : `Page ${pageNum}`}
                                 aria-current={pageNum === page ? 'page' : undefined}

@@ -50,7 +50,7 @@ const Rangement = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
-    const limit = 25; // Consistent with Rotations
+    const limit = 25;
     const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
     useEffect(() => {
@@ -246,6 +246,9 @@ const Rangement = () => {
                                             role="button"
                                             aria-sort={sortConfig.key === key ? sortConfig.direction : 'none'}
                                             scope="col"
+                                            style={{
+                                                width: key === 'BIN_SAP' ? '150px' : key === 'bins_with_qte_nx' ? '200px' : 'auto',
+                                            }}
                                         >
                                             {label} {sortConfig.key === key && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                         </th>
@@ -256,15 +259,13 @@ const Rangement = () => {
                                 {sortedData.map((item, index) => (
                                     <tr key={`${item.article_code}-${index}`} className="hover:bg-gray-50 transition duration-150">
                                         <td className="px-4 py-3 text-gray-900 font-medium text-sm">{item.article_code}</td>
-                                        <td className="px-4 py-3 text-gray-800 text-sm max-w-[16rem]">
-                                            <div className="truncate" title={item.description}>{item.description}</div>
-                                        </td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm whitespace-normal break-words min-w-[150px]">{item.description}</td>
                                         <td className="px-4 py-3 text-gray-800 text-sm">{item.numero_magasin}</td>
                                         <td className="px-4 py-3 text-gray-800 text-sm">{item.division}</td>
                                         <td className="px-4 py-3 text-gray-800 text-sm">{item.warehouse}</td>
-                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.bin_location}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm  min-w-[150px]">{item.bin_location}</td>
                                         <td className="px-4 py-3 text-gray-800 text-sm">{item.type_magasin}</td>
-                                        <td className="px-4 py-3 text-gray-800 text-sm font-medium">
+                                        <td className="px-4 py-3 text-gray-800 text-sm font-medium " >
                                             {item.quantity !== 'N/A' ? (
                                                 <>
                                                     {item.quantity.toFixed(3)}
@@ -274,31 +275,25 @@ const Rangement = () => {
                                         </td>
                                         <td className="px-4 py-3 text-gray-800 text-sm">{item.unit}</td>
                                         <td className="px-4 py-3 text-gray-800 text-sm">{item.type_stock}</td>
-                                        <td className="px-4 py-3 text-gray-800 text-sm max-w-[12rem]">
-                                            <div className="truncate" title={item.designation_type_stock}>{item.designation_type_stock}</div>
-                                        </td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm whitespace-normal break-words min-w-[150px]">{item.designation_type_stock}</td>
                                         <td className="px-4 py-3 text-gray-800 text-sm">{item.groupe_valorisation}</td>
                                         <td className="px-4 py-3 text-gray-800 text-sm">{item.pmp === 'N/A' ? 'N/A' : item.pmp.toFixed(2)}</td>
                                         <td className="px-4 py-3 text-gray-800 text-sm">{item.valeur_stock === 'N/A' ? 'N/A' : item.valeur_stock.toFixed(2)}</td>
                                         <td className="px-4 py-3 text-gray-800 text-sm">{item.devise}</td>
-                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.date_em}</td>
-                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.derniere_sortie}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm min-w-[150px]">{item.date_em}</td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm min-w-[150px]">{item.derniere_sortie}</td>
                                         <td className="px-4 py-3 text-gray-800 text-sm">{item.Marque}</td>
                                         <td className="px-4 py-3 text-gray-800 text-sm">{item.Oracle_item_code}</td>
-                                        <td className="px-4 py-3 text-gray-800 text-sm max-w-[16rem]">
-                                            <div className="truncate" title={item.migration_description}>{item.migration_description}</div>
-                                        </td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm whitespace-normal break-words min-w-[150px]">{item.migration_description}</td>
                                         <td className="px-4 py-3 text-gray-800 text-sm">{item.Qté_validée_SAP === 'N/A' ? 'N/A' : item.Qté_validée_SAP.toFixed(3)}</td>
                                         <td className="px-4 py-3 text-gray-800 text-sm">{item.SAP_Material}</td>
                                         <td className="px-4 py-3 text-gray-800 text-sm">{item.PLANT}</td>
                                         <td className="px-4 py-3 text-gray-800 text-sm">{item.Plant_Validé}</td>
                                         <td className="px-4 py-3 text-gray-800 text-sm">{item.Storage_Location}</td>
-                                        <td className="px-4 py-3 text-gray-800 text-sm max-w-[12rem]">
-                                            <div className="truncate" title={item.Storage_location_Validé}>{item.Storage_location_Validé}</div>
-                                        </td>
+                                        <td className="px-4 py-3 text-gray-800 text-sm whitespace-normal break-words">{item.Storage_location_Validé}</td>
                                         <td className="px-4 py-3 text-gray-800 text-sm">{item.local}</td>
-                                        <td className="px-4 py-3 text-gray-800 text-sm">{item.BIN_SAP}</td>
-                                        <td className="px-4 py-3 text-gray-800 text-sm max-w-[16rem] whitespace-pre-wrap">{item.bins_with_qte_nx}</td>
+                                        <td className="px-6 py-4 text-gray-800 text-sm min-w-[150px]">{item.BIN_SAP}</td> {/* Ajusté pour plus d'espace */}
+                                        <td className="px-6 py-4 text-gray-800 text-sm whitespace-normal break-words min-w-[250px]">{item.bins_with_qte_nx}</td> {/* Ajusté pour plus d'espace */}
                                     </tr>
                                 ))}
                             </tbody>
@@ -324,8 +319,8 @@ const Rangement = () => {
                                 onClick={() => typeof pageNum === 'number' && setCurrentPage(pageNum)}
                                 disabled={pageNum === '...' || pageNum === currentPage}
                                 className={`px-3 py-1 rounded-md text-sm transition duration-200 ${pageNum === currentPage
-                                        ? 'bg-blue-600 text-white'
-                                        : pageNum === '...' ? 'text-gray-400 cursor-default' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                    ? 'bg-blue-600 text-white'
+                                    : pageNum === '...' ? 'text-gray-400 cursor-default' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                                     }`}
                                 aria-label={pageNum === '...' ? 'Ellipsis' : `Page ${pageNum}`}
                                 aria-current={pageNum === currentPage ? 'page' : undefined}

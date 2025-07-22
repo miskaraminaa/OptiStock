@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux'; // Importation ajoutée
+import { useDispatch } from 'react-redux';
 
 import { setPageTitle } from '../features/common/headerSlice';
 import TitleCard from './Cards/TitleCard';
@@ -13,14 +13,12 @@ const FileUpload = () => {
     const [uploadStatus, setUploadStatus] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const navigate = useNavigate();
-    const dispatch = useDispatch(); // Initialisation de useDispatch
+    const dispatch = useDispatch();
 
-    // Définir le titre de la page au montage
     useEffect(() => {
         dispatch(setPageTitle({ title: "Téléversement Fichiers SAP" }));
     }, [dispatch]);
 
-    // Définir les types de fichiers avec des libellés descriptifs
     const fileTypes = [
         { value: 'LE', label: 'LE - Statut Livraisons Entrantes' },
         { value: 'LET', label: 'LET - Tâches Livraisons Entrantes' },
@@ -33,7 +31,6 @@ const FileUpload = () => {
 
     const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-    // Récupérer les fichiers importés depuis le backend
     const fetchImportedFiles = useCallback(async () => {
         try {
             const response = await axios.get(`${API_URL}/uploads/files`);
@@ -49,7 +46,6 @@ const FileUpload = () => {
         }
     }, []);
 
-    // Charger les fichiers importés au montage
     useEffect(() => {
         const loadFiles = async () => {
             await fetchImportedFiles();
@@ -69,9 +65,7 @@ const FileUpload = () => {
 
                 try {
                     const response = await axios.post(`${API_URL}/uploads`, formData, {
-                        headers: {
-                            'Content-Type': 'multipart/form-data'
-                        },
+                        headers: { 'Content-Type': 'multipart/form-data' },
                     });
                     console.log('Réponse téléversement:', response.data);
                     return { status: 'success', message: response.data.message, fileName: file.name };
@@ -127,6 +121,19 @@ const FileUpload = () => {
         acc[file.type].push(file);
         return acc;
     }, {});
+
+    const handleDeleteFile = async (fileId) => {
+        if (window.confirm('Êtes-vous sûr de vouloir supprimer ce fichier et ses données associées ? Cette action est irréversible.')) {
+            try {
+                await axios.delete(`${API_URL}/uploads/files/${fileId}`);
+                await fetchImportedFiles();
+                setUploadStatus('Fichier et données associées supprimés avec succès.');
+            } catch (error) {
+                console.error('Erreur lors de la suppression du fichier:', error);
+                setUploadStatus('Échec de la suppression du fichier.');
+            }
+        }
+    };
 
     if (isLoading) {
         return (
@@ -208,8 +215,16 @@ const FileUpload = () => {
                                                 ({file.status === 'imported' ? 'Importé' : file.status === 'partial' ? 'Partiel' : 'Échoué'})
                                             </span>
                                         </div>
-                                        <div className="text-gray-500 text-sm">
-                                            {new Date(file.import_date).toLocaleString('fr-FR')}
+                                        <div className="flex items-center space-x-4">
+                                            <div className="text-gray-500 text-sm">
+                                                {new Date(file.import_date).toLocaleString('fr-FR')}
+                                            </div>
+                                            <button
+                                                onClick={() => handleDeleteFile(file.id)}
+                                                className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                                            >
+                                                Supprimer
+                                            </button>
                                         </div>
                                     </li>
                                 ))}
