@@ -44,9 +44,7 @@ const Livraison = () => {
         { header: "Type Rayon", key: "Type_Rayon" },
         { header: "Emplacement Cédant", key: "emplacement_cedant" },
         { header: "Emplacement Prenant", key: "Emplacement_prenant" },
-        { header: "Emplacement Final EWM/Qte", key: "Emplacement_EWM_Qte", style: { width: '200px' } },
         { header: "Qte Théo Céd UQA", key: "Qte_theo_ced_UQA" },
-        { header: "Qté Écart", key: "quantite_ecart" },
         { header: "Statut Activité Magasin", key: "statut_entree_stock" },
     ];
 
@@ -57,10 +55,8 @@ const Livraison = () => {
         { header: "Désignation", key: "designation_article" },
         { header: "Emplacement Cédant", key: "Emplacement_cedant" },
         { header: "Emplacement Prenant", key: "Emplacement_prenant" },
-        { header: "Emplacement EWM/Qte", key: "Emplacement_EWM_Qte" },
         { header: "Qte Théo Céd UQA", key: "Qte_theo_ced_UQA" },
         { header: "Quantité", key: "quantit" },
-        { header: "Qté Écart", key: "quantite_ecart" },
         { header: "Statut Activité Magasin", key: "statut_entree_stock" },
     ];
 
