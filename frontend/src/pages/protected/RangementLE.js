@@ -36,7 +36,7 @@ const RangementLE = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
-    const limit = 25; // Consistent with Rotations
+    const limit = 25; 
     const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
     useEffect(() => {

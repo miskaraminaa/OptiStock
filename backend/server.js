@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
+const initializeDatabase = require('./config/initDatabase');
 
 const authRoutes = require('./routes/auth');
 const dimensionsRouter = require('./routes/dimensions');
@@ -19,7 +21,7 @@ try {
     console.log('Routeur rotation chargé avec succès');
 } catch (err) {
     console.error('Échec du chargement du routeur rotation :', err.message, err.stack);
-    process.exit(1); // Arrête le serveur si le routeur échoue
+    process.exit(1);
 }
 try {
     livraisonRouter = require('./routes/livraison');
@@ -35,13 +37,12 @@ try {
     console.warn('Routeur uploads non trouvé, ignoré :', err.message);
 }
 
-
 const app = express();
 
 // Middleware
 app.use(express.json());
 app.use(cors({
-    origin: ['http://localhost:3000', 'http://localhost:3001'],
+    origin: ['http://localhost:5000'], // Matches backend port
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true,
 }));
@@ -49,6 +50,11 @@ app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} | Body:`, JSON.stringify(req.body, null, 2));
     next();
 });
+
+// Serve React build
+const buildPath = path.join(__dirname, 'build');
+console.log(`Serving static files from: ${buildPath}`);
+app.use(express.static(buildPath));
 
 // Routes
 app.use('/auth', authRoutes);
@@ -64,7 +70,7 @@ app.use('/controle', controleRouter);
 app.use('/rangement', rangementRouter);
 app.use('/rangement-le', rangementLeRouter);
 
-// Route de test DB
+// Test DB route
 app.get('/test-db', async (req, res) => {
     const pool = require('./config/db');
     console.log('Pool importé dans /test-db :', pool ? 'Oui' : 'Non');
@@ -77,18 +83,24 @@ app.get('/test-db', async (req, res) => {
     }
 });
 
-// Route par défaut
-app.get('/', (req, res) => {
-    res.send('API est en cours d\'exécution...');
+// Catch-all route for React SPA (Express v5 syntax)
+app.get(/(.*)/, (req, res) => {
+    console.log(`[${new Date().toISOString()}] Serving index.html for path: ${req.path}`);
+    res.sendFile(path.join(buildPath, 'index.html'), (err) => {
+        if (err) {
+            console.error(`[${new Date().toISOString()}] Failed to serve index.html: ${err.message}`);
+            res.status(404).json({ message: 'Page non trouvée' });
+        }
+    });
 });
 
-// Gestionnaire 404
+// 404 handler
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] 404: ${req.method} ${req.url}`);
     res.status(404).json({ message: 'Route non trouvée' });
 });
 
-// Gestionnaire d'erreurs global
+// Global error handler
 app.use((err, req, res, next) => {
     console.error(`[${new Date().toISOString()}] Erreur serveur :`, err.message, err.stack);
     if (res.headersSent) {
@@ -104,6 +116,10 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 (async () => {
     try {
+        console.log('Initialisation de la base de données...');
+        await initializeDatabase();
+        console.log('Base de données initialisée avec succès');
+
         const pool = require('./config/db');
         console.log('Variables d\'environnement :', {
             DB_HOST: process.env.DB_HOST,
@@ -115,11 +131,13 @@ const PORT = process.env.PORT || 5000;
         if (!pool) {
             throw new Error('Pool est indéfini dans config/db');
         }
+
         const [rows] = await pool.query('SELECT 1 AS test');
         console.log('Connexion à la base de données réussie :', rows);
+
         app.listen(PORT, () => console.log(`Serveur en cours d\'exécution sur le port http://localhost:${PORT}`));
     } catch (err) {
-        console.error('Échec du démarrage du serveur à cause d\'une erreur de base de données :', err.message, err.stack);
+        console.error('Échec du démarrage du serveur à cause d\'une erreur :', err.message, err.stack);
         process.exit(1);
     }
 })();
